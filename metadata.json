@@ -1,0 +1,5 @@
+{
+  "name": "ระบบจัดการคดี (Legal Case Management)",
+  "description": "แอปพลิเคชันสำหรับควบคุมงานฟ้องคดี สไตล์ iOS 26 รองรับคดีรถยนต์ชนเสาและคดีค้างชำระ พร้อมเชื่อมต่อ Google Sheets และ Drive",
+  "requestFramePermissions": []
+}
