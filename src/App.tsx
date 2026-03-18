@@ -899,7 +899,35 @@ function App() {
         fetch('/api/sheets/lawyer').then(res => res.json()),
         fetch('/api/cases').then(res => res.json())
       ]);
-      setDropdowns({ source, docState, taskState, lawyer });
+      // Normalize responses into DropdownOption[] (id,label)
+      const toDropdown = (data: any): DropdownOption[] => {
+        if (!data) return [];
+        // if wrapper object with options/normalized/rows
+        if (data.options && Array.isArray(data.options)) return toDropdown(data.options);
+        if (data.normalized && Array.isArray(data.normalized)) return toDropdown(data.normalized);
+        if (data.rows && Array.isArray(data.rows)) {
+          const rows = data.rows;
+          if (rows.length === 0) return [];
+          const keys = Object.keys(rows[0]);
+          if (keys.length >= 2) return rows.map(r => ({ id: String(r[keys[0]] ?? ''), label: String(r[keys[1]] ?? '') }));
+          return rows.map((r: any, i: number) => ({ id: String(i + 1), label: String(r[keys[0]] ?? '') }));
+        }
+        if (Array.isArray(data)) {
+          if (data.length === 0) return [];
+          const first = data[0];
+          if (first && typeof first === 'object') {
+            if ('id' in first && 'label' in first) return data;
+            const keys = Object.keys(first);
+            if (keys.length === 1) return data.map((o: any, i: number) => ({ id: String(i + 1), label: String(o[keys[0]] ?? '') }));
+            if (keys.length >= 2) return data.map((o: any) => ({ id: String(o[keys[0]] ?? ''), label: String(o[keys[1]] ?? '') }));
+          }
+          // primitives
+          return data.map((v: any, i: number) => ({ id: String(i + 1), label: String(v) }));
+        }
+        return [];
+      };
+
+      setDropdowns({ source: toDropdown(source), docState: toDropdown(docState), taskState: toDropdown(taskState), lawyer: toDropdown(lawyer) });
       setCases(casesData);
     } catch (error) {
       console.error("Failed to fetch data", error);
