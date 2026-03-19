@@ -329,12 +329,13 @@ async function startServer() {
       }
 
       // Resolve dropdown ids -> labels
-      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions] = await Promise.all([
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions, customerOptions] = await Promise.all([
         getSheetOptions('source'),
         getSheetOptions('doc_state'),
         getSheetOptions('task_state'),
         getSheetOptions('lawyer'),
         getSheetOptions('fine_type'),
+        getSheetOptions('customer'),
       ]);
 
       newCase.sourceName = (sourceOptions.find((o:any) => o.id === newCase.source) || {}).label || newCase.sourceName || '';
@@ -342,6 +343,7 @@ async function startServer() {
       newCase.taskStateName = (taskStateOptions.find((o:any) => o.id === newCase.taskState) || {}).label || newCase.taskStateName || '';
       newCase.lawyerName = (lawyerOptions.find((o:any) => o.id === newCase.lawyer) || {}).label || newCase.lawyerName || '';
       newCase.fn_fineTypeName = (fineTypeOptions.find((o:any) => o.id === newCase.fn_fineType) || {}).label || newCase.fn_fineTypeName || '';
+      newCase.fn_customerName = (customerOptions.find((o:any) => o.id === newCase.fn_customer) || {}).label || newCase.fn_customerName || '';
 
       console.log('Resolved labels before append:', {
         source: newCase.sourceName,
@@ -349,12 +351,13 @@ async function startServer() {
         taskState: newCase.taskStateName,
         lawyer: newCase.lawyerName,
         fn_fineType: newCase.fn_fineTypeName,
+        fn_customer: newCase.fn_customerName,
       });
 
       // Append to sheet
       const sheets = await getSheetsClient();
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       console.log('Using headers for append:', effectiveHeaders);
       
@@ -416,18 +419,21 @@ async function startServer() {
       }
 
       // resolve dropdown labels
-      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions] = await Promise.all([
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions, customerOptions] = await Promise.all([
         getSheetOptions('source'),
         getSheetOptions('doc_state'),
         getSheetOptions('task_state'),
         getSheetOptions('lawyer'),
         getSheetOptions('fine_type'),
+        getSheetOptions('customer'),
       ]);
       if (updateData.source) updateData.sourceName = (sourceOptions.find((o:any) => o.id === updateData.source) || {}).label || updateData.sourceName || '';
       if (updateData.docState) updateData.docStateName = (docStateOptions.find((o:any) => o.id === updateData.docState) || {}).label || updateData.docStateName || '';
       if (updateData.taskState) updateData.taskStateName = (taskStateOptions.find((o:any) => o.id === updateData.taskState) || {}).label || updateData.taskStateName || '';
       if (updateData.lawyer) updateData.lawyerName = (lawyerOptions.find((o:any) => o.id === updateData.lawyer) || {}).label || updateData.lawyerName || '';
       if (updateData.fn_fineType) updateData.fn_fineTypeName = (fineTypeOptions.find((o:any) => o.id === updateData.fn_fineType) || {}).label || updateData.fn_fineTypeName || '';
+      if (updateData.fn_customer) updateData.fn_customerName = (customerOptions.find((o:any) => o.id === updateData.fn_customer) || {}).label || updateData.fn_customerName || '';
+      if (updateData.fn_customer) updateData.fn_customerName = (customerOptions.find((o:any) => o.id === updateData.fn_customer) || {}).label || updateData.fn_customerName || '';
 
       // Update in sheet
       const cases = await readSheetAsObjects('case');
@@ -437,7 +443,7 @@ async function startServer() {
       }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       const updated = { ...existing, ...updateData };
       
@@ -484,7 +490,7 @@ async function startServer() {
       const updated = { ...existing, taskState, taskStateName } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       
       // Convert fn_additionalFees array to JSON string if present
@@ -528,7 +534,7 @@ async function startServer() {
       const updated = { ...existing, isArchived: true } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       
       // Convert fn_additionalFees array to JSON string if present

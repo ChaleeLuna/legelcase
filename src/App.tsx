@@ -120,12 +120,12 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
           
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ประเภทงาน <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'car_crash' })}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
                   formData.taskType === 'car_crash' 
                     ? 'border-blue-500 bg-blue-50/50 text-blue-700' 
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
@@ -138,7 +138,7 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'overdue_payment' })}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
                   formData.taskType === 'overdue_payment' 
                     ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700' 
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
@@ -151,7 +151,7 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'fine', fn_additionalFees: [] })}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
                   formData.taskType === 'fine' 
                     ? 'border-amber-500 bg-amber-50/50 text-amber-700' 
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
@@ -271,8 +271,8 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 <input type="text" name="cc_driverName" required value={formData.cc_driverName} onChange={handleChange} placeholder="ระบุชื่อ" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง</label>
-                <input type="text" name="cc_ReferenceNumber" value={formData.cc_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
+                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง (CA) </label>
+                <input type="text" name="cc_ReferenceNumber" value={formData.cc_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง (CA) " className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ยอดเสียหาย (บาท) <span className="text-red-500">*</span></label>
@@ -295,8 +295,8 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">เลขที่อ้างอิง <span className="text-red-500">*</span></label>
-                <input type="text" name="op_ReferenceNumber" required value={formData.op_ReferenceNumber} onChange={handleChange} placeholder="ระบุเลขที่อ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
+                <label className="text-sm font-medium text-slate-700 ml-1">เลขที่อ้างอิง (CA) <span className="text-red-500">*</span></label>
+                <input type="text" name="op_ReferenceNumber" required value={formData.op_ReferenceNumber} onChange={handleChange} placeholder="ระบุเลขที่อ้างอิง (CA) " className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
@@ -345,8 +345,8 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 <input type="text" name="fn_customerName" required value={formData.fn_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง <span className="text-red-500">*</span></label>
-                <input type="text" name="fn_ReferenceNumber" required value={formData.fn_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
+                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง (CA)  <span className="text-red-500">*</span></label>
+                <input type="text" name="fn_ReferenceNumber" required value={formData.fn_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง (CA) " className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">บิลเดือนเป็นช่วง (ตั้งแต่) <span className="text-red-500">*</span></label>
@@ -1265,14 +1265,8 @@ function App() {
         <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 p-4 md:p-8 lg:p-12 max-w-7xl mx-auto">
-          {/* Prototype Banner */}
-          <div className="mb-8 p-4 bg-amber-50/80 backdrop-blur-md border border-amber-200/50 rounded-2xl flex items-start gap-3 text-amber-800">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium">โหมด Prototype (จำลองข้อมูล)</p>
-              <p className="mt-1 opacity-80">ระบบกำลังแสดงผลด้วยข้อมูลจำลอง การเชื่อมต่อ Google Sheets และ Google Drive จำเป็นต้องตั้งค่า Service Account ในฝั่ง Server ก่อนนำไปใช้งานจริง</p>
-            </div>
-          </div>
+        
+     
 
           <AnimatePresence mode="wait">
             <motion.div
