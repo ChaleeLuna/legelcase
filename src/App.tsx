@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { 
   FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown, 
   LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2, 
-  Archive, Trello, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical
+  Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical
 } from 'lucide-react';
 
 // --- Types ---
@@ -499,7 +499,15 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
 
 // Kanban Board Component
 const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dropdowns, onUpdate: () => void }) => {
-  const activeCases = cases.filter(c => !c.isArchived);
+  const isArchivedValue = (value: any) => {
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      return v === 'true' || v === '1' || v === 'yes';
+    }
+    return Boolean(value);
+  };
+
+  const activeCases = cases.filter(c => !isArchivedValue(c.isArchived));
   const [selectedCase, setSelectedCase] = useState<any>(null);
   
   const columns = [
@@ -562,9 +570,13 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                               onClick={() => setSelectedCase(c)}
+                              style={{
+                                ...(provided.draggableProps.style as any),
+                                zIndex: snapshot.isDragging ? 9999 : undefined,
+                              }}
                               className={`mb-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all ${
-                                snapshot.isDragging ? 'shadow-xl scale-105 rotate-2 z-50' : 'hover:shadow-md hover:border-blue-300'
-                              }`}
+                                  snapshot.isDragging ? 'shadow-xl' : 'hover:shadow-md hover:border-blue-300'
+                                }`}
                             >
                               <div className="flex justify-between items-start mb-2">
                                 <span className="text-xs font-bold text-slate-500">{c.docNumber}</span>
@@ -619,7 +631,15 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
   const [selectedCase, setSelectedCase] = useState<any>(null);
   const itemsPerPage = 8;
 
-  const activeCases = cases.filter(c => !c.isArchived);
+  const isArchivedValue = (value: any) => {
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      return v === 'true' || v === '1' || v === 'yes';
+    }
+    return Boolean(value);
+  };
+
+  const activeCases = cases.filter(c => !isArchivedValue(c.isArchived));
 
   const filteredCases = activeCases.filter(c => 
     (c.docNumber || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -941,7 +961,6 @@ function App() {
   const navItems = [
     { id: 'stats', label: 'สถิติภาพรวม', icon: BarChart2 },
     { id: 'list', label: 'รายการคดี', icon: LayoutDashboard },
-    { id: 'kanban', label: 'กระดานงาน', icon: Trello },
     { id: 'create', label: 'สร้างรายการใหม่', icon: PlusCircle },
   ];
 
@@ -1061,7 +1080,6 @@ function App() {
             >
               {currentView === 'stats' && <StatsDashboard cases={cases} />}
               {currentView === 'list' && <ListView cases={cases} dropdowns={dropdowns} onUpdate={fetchData} />}
-              {currentView === 'kanban' && <KanbanBoard cases={cases} dropdowns={dropdowns} onUpdate={fetchData} />}
               {currentView === 'create' && <CreateForm dropdowns={dropdowns} onSuccess={fetchData} />}
             </motion.div>
           </AnimatePresence>

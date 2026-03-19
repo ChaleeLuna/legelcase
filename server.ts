@@ -88,8 +88,7 @@ async function startServer() {
         } else if (headers.length === 1) {
           normalized = values.slice(1).map((row, i) => ({ id: `${i + 1}`, label: row[0] ?? "" }));
         }
-        console.log(normalized)
-        console.log(`Fetched ${rows.toString()} rows from Google Sheets (service account)`);
+     
         return res.json({ rows, options: normalized, normalized });
       } catch (err) {
         console.error("Service account Sheets fetch failed, falling back:", err);
@@ -155,107 +154,358 @@ async function startServer() {
       }
     }
 
-    // Mock data for dropdowns (fallback)
-    const mockData: Record<string, any[]> = {
-      source: [
-        { id: "1", label: "ศาลแพ่ง" },
-        { id: "2", label: "ศาลอาญา" },
-        { id: "3", label: "ตำรวจ" },
-      ],
-      doc_state: [
-        { id: "1", label: "ผ่าน" },
-        { id: "2", label: "ไม่ผ่าน" },
-        { id: "3", label: "รอตรวจสอบ" },
-      ],
-      task_state: [
-        { id: "1", label: "รับเรื่อง" },
-        { id: "2", label: "กำลังดำเนินการ" },
-        { id: "3", label: "เสร็จสิ้น" },
-      ],
-      lawyer: [
-        { id: "1", label: "ทนายสมชาย" },
-        { id: "2", label: "ทนายสมหญิง" },
-        { id: "3", label: "ทนายวิชัย" },
-      ],
-    };
-
-    return res.json(mockData[sheetName] || []);
+    return res.status(500).json({ error: "Unable to fetch sheet data" });
   });
 
-  // Mock API to get all cases
-  let mockCases = Array.from({ length: 35 }).map((_, i) => {
-    const isCarCrash = i % 2 === 0;
-    return {
-      id: `${i + 1}`,
-      taskType: isCarCrash ? "car_crash" : "overdue_payment",
-      receiveDate: `2026-03-${(i % 28 + 1).toString().padStart(2, '0')}`,
-      docNumber: `รย.${1000 + i}/2569`,
-      source: (i % 3 + 1).toString(),
-      sourceName: i % 3 === 0 ? "ศาลแพ่ง" : i % 3 === 1 ? "ศาลอาญา" : "ตำรวจ",
-      docState: (i % 3 + 1).toString(),
-      docStateName: i % 3 === 0 ? "ผ่าน" : i % 3 === 1 ? "ไม่ผ่าน" : "รอตรวจสอบ",
-      taskState: (i % 3 + 1).toString(),
-      taskStateName: i % 3 === 0 ? "รับเรื่อง" : i % 3 === 1 ? "กำลังดำเนินการ" : "เสร็จสิ้น",
-      lawyer: (i % 3 + 1).toString(),
-      lawyerName: i % 3 === 0 ? "ทนายสมชาย" : i % 3 === 1 ? "ทนายสมหญิง" : "ทนายวิชัย",
-      returnDocNumber: i % 4 === 0 ? `คด.${500+i}/2569` : "",
-      licensePlate: isCarCrash ? `กท ${1000 + i}` : "",
-      driverName: isCarCrash ? `นายสมชาย ใจดี ${i}` : "",
-      damageAmount: isCarCrash ? `${50000 + i * 1000}` : "",
-      referenceNumber: !isCarCrash ? `REF-00${123 + i}` : "",
-      overdueBillStart: !isCarCrash ? "2025-01-01" : "",
-      overdueBillEnd: !isCarCrash ? "2025-12-31" : "",
-      amount: !isCarCrash ? `${120000 + i * 5000}` : "",
-      isArchived: false
-    };
+  // Helper: get a Sheets client for service-account access (write/read)
+  async function getSheetsClient() {
+    if (!GOOGLE_SHEET_ID) return null;
+    if (!GOOGLE_SERVICE_ACCOUNT_KEY) return null;
+    try {
+      const key = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+      const auth = new google.auth.GoogleAuth({
+        credentials: key,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      });
+      await auth.getClient();
+      return google.sheets({ version: "v4", auth });
+    } catch (err) {
+      console.error("getSheetsClient error", err);
+      return null;
+    }
+  }
+
+  // Helper: read header row from a sheet
+  async function getSheetHeaders(sheetName: string): Promise<string[]> {
+    const sheets = await getSheetsClient();
+    if (sheets) {
+      try {
+        const resp = await sheets.spreadsheets.values.get({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: `${sheetName}!1:1`,
+        });
+        const values: any[][] = resp.data.values || [];
+        return (values[0] || []).map(String);
+      } catch (err) {
+        console.error("getSheetHeaders error (service account)", err);
+      }
+    }
+
+    if (GOOGLE_SHEET_ID && GOOGLE_API_KEY) {
+      try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(sheetName)}!1:1?key=${GOOGLE_API_KEY}`;
+        const resp = await fetch(url);
+        if (!resp.ok) return [];
+        const json = await resp.json();
+        const values: any[][] = json.values || [];
+        return (values[0] || []).map(String);
+      } catch (err) {
+        console.error("getSheetHeaders error (api key)", err);
+      }
+    }
+
+    return [];
+  }
+
+  // Helper: get normalized options for a sheet ([{id,label}])
+  async function getSheetOptions(sheetName: string) {
+    // Prefer service-account for accurate reads
+    const sheets = await getSheetsClient();
+    if (sheets) {
+      try {
+        const range = `${sheetName}!A:Z`;
+        const resp = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID!, range });
+        const values: string[][] = resp.data.values || [];
+        if (values.length === 0) return [];
+        const headers = values[0];
+        if (headers.length >= 2) {
+          return values.slice(1).map((row, i) => ({ id: String(row[0] ?? `${i + 1}`), label: String(row[1] ?? row[0] ?? "") }));
+        }
+        return values.slice(1).map((row, i) => ({ id: String(i + 1), label: String(row[0] ?? "") }));
+      } catch (err) {
+        console.error('getSheetOptions(service account) error', err);
+      }
+    }
+
+    // Fallback to API key read-only
+    if (GOOGLE_SHEET_ID && GOOGLE_API_KEY) {
+      try {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${GOOGLE_API_KEY}`;
+        const resp = await fetch(url);
+        if (!resp.ok) return [];
+        const json = await resp.json();
+        const values: string[][] = json.values || [];
+        if (values.length === 0) return [];
+        const headers = values[0];
+        if (headers.length >= 2) {
+          return values.slice(1).map((row, i) => ({ id: String(row[0] ?? `${i + 1}`), label: String(row[1] ?? row[0] ?? "") }));
+        }
+        return values.slice(1).map((row, i) => ({ id: String(i + 1), label: String(row[0] ?? "") }));
+      } catch (err) {
+        console.error('getSheetOptions(api key) error', err);
+      }
+    }
+
+    return [];
+  }
+
+  // Helper to read a sheet as an array of objects (uses first row as headers)
+  async function readSheetAsObjects(sheetName: string) {
+    const sheets = await getSheetsClient();
+    if (!sheets) return [];
+
+    const range = `${sheetName}!A:Z`;
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID!,
+      range,
+    });
+
+    const values: any[][] = resp.data.values || [];
+    if (values.length === 0) return [];
+
+    const headers = values[0].map(String);
+    return values.slice(1).map((row, idx) => {
+      const obj: Record<string, any> = { __rowNum: idx + 2 };
+      headers.forEach((h, i) => {
+        const raw = row[i] ?? "";
+        const key = String(h).trim();
+        if (key.toLowerCase() === "isarchived" || key.toLowerCase() === "archived") {
+          const v = String(raw).trim().toLowerCase();
+          obj[key] = v === "true" || v === "1" || v === "yes";
+        } else {
+          obj[key] = raw;
+        }
+      });
+      return obj;
+    });
+  }
+
+  // GET all cases (from sheet)
+  app.get("/api/cases", async (req, res) => {
+    try {
+      const cases = await readSheetAsObjects("case");
+      res.json(cases);
+    } catch (err) {
+      console.error("Failed to load cases from sheet:", err);
+      res.status(500).json({ error: "Failed to load cases" });
+    }
   });
 
-  app.get("/api/cases", (req, res) => {
-    res.json(mockCases);
-  });
-
-  app.post("/api/cases", upload.single("courtDocument"), (req, res) => {
+  app.post("/api/cases", upload.single("courtDocument"), async (req, res) => {
     console.log("Received case data:", req.body);
     if (req.file) {
       console.log("Received file:", req.file.originalname);
     }
-    const newCase = {
-      id: `${mockCases.length + 1}`,
-      ...req.body,
-      isArchived: false
-    };
-    mockCases.push(newCase);
-    res.json({ success: true, message: "บันทึกข้อมูลสำเร็จ" });
+
+    try {
+      // Determine next numeric ID (based on existing sheet rows)
+      const cases = await readSheetAsObjects("case");
+      const maxId = cases.reduce((max, c) => {
+        const parsed = parseInt(c.id, 10);
+        return isNaN(parsed) ? max : Math.max(max, parsed);
+      }, 0);
+      const newId = String(maxId + 1);
+
+      const newCase: Record<string, any> = {
+        id: newId,
+        ...req.body,
+        isArchived: false,
+      };
+
+      // Resolve dropdown ids -> labels
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions] = await Promise.all([
+        getSheetOptions('source'),
+        getSheetOptions('doc_state'),
+        getSheetOptions('task_state'),
+        getSheetOptions('lawyer'),
+      ]);
+
+      newCase.sourceName = (sourceOptions.find((o:any) => o.id === newCase.source) || {}).label || newCase.sourceName || '';
+      newCase.docStateName = (docStateOptions.find((o:any) => o.id === newCase.docState) || {}).label || newCase.docStateName || '';
+      newCase.taskStateName = (taskStateOptions.find((o:any) => o.id === newCase.taskState) || {}).label || newCase.taskStateName || '';
+      newCase.lawyerName = (lawyerOptions.find((o:any) => o.id === newCase.lawyer) || {}).label || newCase.lawyerName || '';
+
+      console.log('Resolved labels before append:', {
+        source: newCase.sourceName,
+        docState: newCase.docStateName,
+        taskState: newCase.taskStateName,
+        lawyer: newCase.lawyerName,
+      });
+
+      // Append to sheet
+      const sheets = await getSheetsClient();
+      const headers = await getSheetHeaders('case');
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      console.log('Using headers for append:', effectiveHeaders);
+      const row = effectiveHeaders.map(h => newCase[h] ?? '');
+      console.log('Row to append:', row);
+
+      if (sheets) {
+        const appendResp = await sheets.spreadsheets.values.append({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: 'case!A:Z',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [row] }
+        });
+        console.log('Sheets append response status:', appendResp?.status);
+        console.log('Sheets append response data:', appendResp?.data);
+      } else if (GOOGLE_API_KEY) {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/case!A:Z:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${GOOGLE_API_KEY}`;
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] })
+        });
+        const text = await resp.text();
+        console.log('API-key append response status:', resp.status, 'body:', text);
+      } else {
+        console.warn('No Sheets client or API key, cannot append case to sheet');
+      }
+
+      res.json({ success: true, message: "บันทึกข้อมูลสำเร็จ", data: newCase });
+    } catch (err) {
+      console.error('Failed to append case to Google Sheet:', err);
+      res.status(500).json({ error: 'Failed to save case' });
+    }
   });
 
-  app.put("/api/cases/:id", upload.single("courtDocument"), (req, res) => {
+  app.put("/api/cases/:id", upload.single("courtDocument"), async (req, res) => {
     console.log(`Updating case ${req.params.id}:`, req.body);
     if (req.file) {
       console.log("Received file update:", req.file.originalname);
     }
-    const index = mockCases.findIndex(c => c.id === req.params.id);
-    if (index !== -1) {
-      mockCases[index] = { ...mockCases[index], ...req.body };
+
+    try {
+      const updateData: any = { ...req.body };
+
+      // resolve dropdown labels
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions] = await Promise.all([
+        getSheetOptions('source'),
+        getSheetOptions('doc_state'),
+        getSheetOptions('task_state'),
+        getSheetOptions('lawyer'),
+      ]);
+      if (updateData.source) updateData.sourceName = (sourceOptions.find((o:any) => o.id === updateData.source) || {}).label || updateData.sourceName || '';
+      if (updateData.docState) updateData.docStateName = (docStateOptions.find((o:any) => o.id === updateData.docState) || {}).label || updateData.docStateName || '';
+      if (updateData.taskState) updateData.taskStateName = (taskStateOptions.find((o:any) => o.id === updateData.taskState) || {}).label || updateData.taskStateName || '';
+      if (updateData.lawyer) updateData.lawyerName = (lawyerOptions.find((o:any) => o.id === updateData.lawyer) || {}).label || updateData.lawyerName || '';
+
+      // Update in sheet
+      const cases = await readSheetAsObjects('case');
+      const existing = cases.find(c => String(c.id) === String(req.params.id));
+      if (!existing) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      const rowNum = existing.__rowNum;
+      const headers = await getSheetHeaders('case');
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const updated = { ...existing, ...updateData };
+      const row = effectiveHeaders.map(h => updated[h] ?? '');
+
+      const sheets = await getSheetsClient();
+      if (sheets) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: `case!A${rowNum}:Z${rowNum}`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [row] },
+        });
+      } else if (GOOGLE_API_KEY) {
+        const range = `case!A${rowNum}:Z${rowNum}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
+        await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] })
+        });
+      }
+
+      res.json({ success: true, message: "อัปเดตข้อมูลสำเร็จ" });
+    } catch (err) {
+      console.error('Failed to update case', err);
+      res.status(500).json({ error: 'Failed to update case' });
     }
-    res.json({ success: true, message: "อัปเดตข้อมูลสำเร็จ" });
   });
 
-  app.patch("/api/cases/:id/state", express.json(), (req, res) => {
+  app.patch("/api/cases/:id/state", express.json(), async (req, res) => {
     const { taskState, taskStateName } = req.body;
-    const index = mockCases.findIndex(c => c.id === req.params.id);
-    if (index !== -1) {
-      mockCases[index].taskState = taskState;
-      mockCases[index].taskStateName = taskStateName;
+
+    try {
+      const cases = await readSheetAsObjects('case');
+      const existing = cases.find(c => String(c.id) === String(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Case not found' });
+
+      const updated = { ...existing, taskState, taskStateName };
+      const rowNum = existing.__rowNum;
+      const headers = await getSheetHeaders('case');
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const row = effectiveHeaders.map(h => updated[h] ?? '');
+
+      const sheets = await getSheetsClient();
+      if (sheets) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: `case!A${rowNum}:Z${rowNum}`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [row] },
+        });
+      } else if (GOOGLE_API_KEY) {
+        const range = `case!A${rowNum}:Z${rowNum}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
+        await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] })
+        });
+      }
+
+      res.json({ success: true, message: "อัปเดตสถานะสำเร็จ" });
+    } catch (err) {
+      console.error('Failed to update case state', err);
+      res.status(500).json({ error: 'Failed to update case state' });
     }
-    res.json({ success: true, message: "อัปเดตสถานะสำเร็จ" });
   });
 
-  app.patch("/api/cases/:id/archive", express.json(), (req, res) => {
-    const index = mockCases.findIndex(c => c.id === req.params.id);
-    if (index !== -1) {
-      mockCases[index].isArchived = true;
+  app.patch("/api/cases/:id/archive", express.json(), async (req, res) => {
+    try {
+      const cases = await readSheetAsObjects('case');
+      const existing = cases.find(c => String(c.id) === String(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Case not found' });
+
+      const updated = { ...existing, isArchived: true };
+      const rowNum = existing.__rowNum;
+      const headers = await getSheetHeaders('case');
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const row = effectiveHeaders.map(h => updated[h] ?? '');
+
+      const sheets = await getSheetsClient();
+      if (sheets) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: `case!A${rowNum}:Z${rowNum}`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [row] },
+        });
+      } else if (GOOGLE_API_KEY) {
+        const range = `case!A${rowNum}:Z${rowNum}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
+        await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] })
+        });
+      }
+
+      res.json({ success: true, message: "จัดเก็บข้อมูลสำเร็จ" });
+    } catch (err) {
+      console.error('Failed to archive case', err);
+      res.status(500).json({ error: 'Failed to archive case' });
     }
-    res.json({ success: true, message: "จัดเก็บข้อมูลสำเร็จ" });
   });
 
   // Vite middleware for development
