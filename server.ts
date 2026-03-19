@@ -213,7 +213,7 @@ async function startServer() {
     const sheets = await getSheetsClient();
     if (sheets) {
       try {
-        const range = `${sheetName}!A:Z`;
+        const range = `${sheetName}!A:AE`;
         const resp = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID!, range });
         const values: string[][] = resp.data.values || [];
         if (values.length === 0) return [];
@@ -254,7 +254,7 @@ async function startServer() {
     const sheets = await getSheetsClient();
     if (!sheets) return [];
 
-    const range = `${sheetName}!A:Z`;
+    const range = `${sheetName}!A:AE`;
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId: GOOGLE_SHEET_ID!,
       range,
@@ -272,6 +272,13 @@ async function startServer() {
         if (key.toLowerCase() === "isarchived" || key.toLowerCase() === "archived") {
           const v = String(raw).trim().toLowerCase();
           obj[key] = v === "true" || v === "1" || v === "yes";
+        } else if (key === "fn_additionalFees") {
+          // Parse JSON string back to array
+          try {
+            obj[key] = JSON.parse(String(raw));
+          } catch {
+            obj[key] = [];
+          }
         } else {
           obj[key] = raw;
         }
@@ -312,39 +319,58 @@ async function startServer() {
         isArchived: false,
       };
 
+      // Parse fn_additionalFees JSON string back to array
+      if (typeof newCase.fn_additionalFees === 'string') {
+        try {
+          newCase.fn_additionalFees = JSON.parse(newCase.fn_additionalFees);
+        } catch {
+          newCase.fn_additionalFees = [];
+        }
+      }
+
       // Resolve dropdown ids -> labels
-      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions] = await Promise.all([
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions] = await Promise.all([
         getSheetOptions('source'),
         getSheetOptions('doc_state'),
         getSheetOptions('task_state'),
         getSheetOptions('lawyer'),
+        getSheetOptions('fine_type'),
       ]);
 
       newCase.sourceName = (sourceOptions.find((o:any) => o.id === newCase.source) || {}).label || newCase.sourceName || '';
       newCase.docStateName = (docStateOptions.find((o:any) => o.id === newCase.docState) || {}).label || newCase.docStateName || '';
       newCase.taskStateName = (taskStateOptions.find((o:any) => o.id === newCase.taskState) || {}).label || newCase.taskStateName || '';
       newCase.lawyerName = (lawyerOptions.find((o:any) => o.id === newCase.lawyer) || {}).label || newCase.lawyerName || '';
+      newCase.fn_fineTypeName = (fineTypeOptions.find((o:any) => o.id === newCase.fn_fineType) || {}).label || newCase.fn_fineTypeName || '';
 
       console.log('Resolved labels before append:', {
         source: newCase.sourceName,
         docState: newCase.docStateName,
         taskState: newCase.taskStateName,
         lawyer: newCase.lawyerName,
+        fn_fineType: newCase.fn_fineTypeName,
       });
 
       // Append to sheet
       const sheets = await getSheetsClient();
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       console.log('Using headers for append:', effectiveHeaders);
-      const row = effectiveHeaders.map(h => newCase[h] ?? '');
+      
+      // Convert fn_additionalFees array to JSON string for sheet storage
+      const rowData = { ...newCase };
+      if (Array.isArray(rowData.fn_additionalFees)) {
+        rowData.fn_additionalFees = JSON.stringify(rowData.fn_additionalFees);
+      }
+      
+      const row = effectiveHeaders.map(h => rowData[h] ?? '');
       console.log('Row to append:', row);
 
       if (sheets) {
         const appendResp = await sheets.spreadsheets.values.append({
           spreadsheetId: GOOGLE_SHEET_ID!,
-          range: 'case!A:Z',
+          range: 'case!A:AE',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: [row] }
@@ -352,7 +378,7 @@ async function startServer() {
         console.log('Sheets append response status:', appendResp?.status);
         console.log('Sheets append response data:', appendResp?.data);
       } else if (GOOGLE_API_KEY) {
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/case!A:Z:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${GOOGLE_API_KEY}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/case!A:AE:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${GOOGLE_API_KEY}`;
         const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -380,17 +406,28 @@ async function startServer() {
     try {
       const updateData: any = { ...req.body };
 
+      // Parse fn_additionalFees JSON string back to array
+      if (typeof updateData.fn_additionalFees === 'string') {
+        try {
+          updateData.fn_additionalFees = JSON.parse(updateData.fn_additionalFees);
+        } catch {
+          updateData.fn_additionalFees = [];
+        }
+      }
+
       // resolve dropdown labels
-      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions] = await Promise.all([
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions] = await Promise.all([
         getSheetOptions('source'),
         getSheetOptions('doc_state'),
         getSheetOptions('task_state'),
         getSheetOptions('lawyer'),
+        getSheetOptions('fine_type'),
       ]);
       if (updateData.source) updateData.sourceName = (sourceOptions.find((o:any) => o.id === updateData.source) || {}).label || updateData.sourceName || '';
       if (updateData.docState) updateData.docStateName = (docStateOptions.find((o:any) => o.id === updateData.docState) || {}).label || updateData.docStateName || '';
       if (updateData.taskState) updateData.taskStateName = (taskStateOptions.find((o:any) => o.id === updateData.taskState) || {}).label || updateData.taskStateName || '';
       if (updateData.lawyer) updateData.lawyerName = (lawyerOptions.find((o:any) => o.id === updateData.lawyer) || {}).label || updateData.lawyerName || '';
+      if (updateData.fn_fineType) updateData.fn_fineTypeName = (fineTypeOptions.find((o:any) => o.id === updateData.fn_fineType) || {}).label || updateData.fn_fineTypeName || '';
 
       // Update in sheet
       const cases = await readSheetAsObjects('case');
@@ -400,21 +437,27 @@ async function startServer() {
       }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       const updated = { ...existing, ...updateData };
+      
+      // Convert fn_additionalFees array to JSON string for sheet storage
+      if (Array.isArray(updated.fn_additionalFees)) {
+        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      }
+      
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
       const sheets = await getSheetsClient();
       if (sheets) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:Z${rowNum}`,
+          range: `case!A${rowNum}:AZ${rowNum}`,
           valueInputOption: 'RAW',
           requestBody: { values: [row] },
         });
       } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:Z${rowNum}`;
+        const range = `case!A${rowNum}:AZ${rowNum}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
         await fetch(url, {
           method: 'PUT',
@@ -438,23 +481,29 @@ async function startServer() {
       const existing = cases.find(c => String(c.id) === String(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Case not found' });
 
-      const updated = { ...existing, taskState, taskStateName };
+      const updated = { ...existing, taskState, taskStateName } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      
+      // Convert fn_additionalFees array to JSON string if present
+      if (Array.isArray(updated.fn_additionalFees)) {
+        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      }
+      
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
       const sheets = await getSheetsClient();
       if (sheets) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:Z${rowNum}`,
+          range: `case!A${rowNum}:AZ${rowNum}`,
           valueInputOption: 'RAW',
           requestBody: { values: [row] },
         });
       } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:Z${rowNum}`;
+        const range = `case!A${rowNum}:AZ${rowNum}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
         await fetch(url, {
           method: 'PUT',
@@ -476,23 +525,29 @@ async function startServer() {
       const existing = cases.find(c => String(c.id) === String(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Case not found' });
 
-      const updated = { ...existing, isArchived: true };
+      const updated = { ...existing, isArchived: true } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','licensePlate','driverName','damageAmount','referenceNumber','overdueBillStart','overdueBillEnd','amount','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      
+      // Convert fn_additionalFees array to JSON string if present
+      if (Array.isArray(updated.fn_additionalFees)) {
+        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      }
+      
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
       const sheets = await getSheetsClient();
       if (sheets) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:Z${rowNum}`,
+          range: `case!A${rowNum}:AZ${rowNum}`,
           valueInputOption: 'RAW',
           requestBody: { values: [row] },
         });
       } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:Z${rowNum}`;
+        const range = `case!A${rowNum}:AZ${rowNum}`;
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
         await fetch(url, {
           method: 'PUT',

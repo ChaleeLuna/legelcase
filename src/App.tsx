@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { 
   FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown, 
   LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2, 
-  Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical
+  Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus
 } from 'lucide-react';
 
 // --- Types ---
@@ -15,6 +15,7 @@ type Dropdowns = {
   docState: DropdownOption[];
   taskState: DropdownOption[];
   lawyer: DropdownOption[];
+  fineType: DropdownOption[];
 };
 
 // --- Components ---
@@ -144,7 +145,20 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <CreditCard className="w-6 h-6 mb-2" />
-                <span className="text-sm font-medium">ค้างชำระ</span>
+                <span className="text-sm font-medium">ค่าไฟฟ้าค้างชำระ</span>
+              </button>
+              <button
+                type="button"
+                disabled={isEditMode}
+                onClick={() => setFormData({ ...formData, taskType: 'fine', fn_additionalFees: [] })}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${
+                  formData.taskType === 'fine' 
+                    ? 'border-amber-500 bg-amber-50/50 text-amber-700' 
+                    : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                <Gavel className="w-6 h-6 mb-2" />
+                <span className="text-sm font-medium">ค่าไฟฟ้าปรับปรุง</span>
               </button>
             </div>
             {isEditMode && <p className="text-xs text-amber-600 ml-1 mt-1">ไม่สามารถแก้ไขประเภทงานได้</p>}
@@ -226,6 +240,11 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
               </div>
             </div>
           </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-medium text-slate-700 ml-1">หมายเหตุ</label>
+            <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="ระบุหมายเหตุ หรือข้อมูลเพิ่มเติม" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400 resize-none" rows={3} />
+          </div>
         </div>
       </section>
 
@@ -245,15 +264,19 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ทะเบียนรถ <span className="text-red-500">*</span></label>
-                <input type="text" name="licensePlate" required value={formData.licensePlate} onChange={handleChange} placeholder="เช่น กท 1234" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
+                <input type="text" name="cc_licensePlate" required value={formData.cc_licensePlate} onChange={handleChange} placeholder="เช่น กท 1234" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ชื่อ-นามสกุล คนขับ หรือ ประกัน <span className="text-red-500">*</span></label>
-                <input type="text" name="driverName" required value={formData.driverName} onChange={handleChange} placeholder="ระบุชื่อ" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
+                <input type="text" name="cc_driverName" required value={formData.cc_driverName} onChange={handleChange} placeholder="ระบุชื่อ" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
               </div>
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง</label>
+                <input type="text" name="cc_ReferenceNumber" value={formData.cc_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ยอดเสียหาย (บาท) <span className="text-red-500">*</span></label>
-                <input type="number" name="damageAmount" required value={formData.damageAmount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
+                <input type="number" name="cc_damageAmount" required value={formData.cc_damageAmount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
               </div>
             </div>
           </motion.section>
@@ -268,24 +291,142 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
             className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
           >
             <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-emerald-500" /> ข้อมูลคดีค้างชำระ
+              <CreditCard className="w-5 h-5 text-emerald-500" /> ข้อมูลคดีค่าไฟฟ้าค้างชำระ
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">เลขที่อ้างอิง <span className="text-red-500">*</span></label>
-                <input type="text" name="referenceNumber" required value={formData.referenceNumber} onChange={handleChange} placeholder="ระบุเลขที่อ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
+                <input type="text" name="op_ReferenceNumber" required value={formData.op_ReferenceNumber} onChange={handleChange} placeholder="ระบุเลขที่อ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
+                <input type="text" name="op_customerName" required value={formData.op_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">บิลที่ค้าง (ตั้งแต่) <span className="text-red-500">*</span></label>
-                <input type="date" name="overdueBillStart" required value={formData.overdueBillStart} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-700" />
+                <input type="date" name="op_OverdueBillStart" required value={formData.op_OverdueBillStart} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-700" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">บิลที่ค้าง (ถึง) <span className="text-red-500">*</span></label>
-                <input type="date" name="overdueBillEnd" required value={formData.overdueBillEnd} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-700" />
+                <input type="date" name="op_overdueBillEnd" required value={formData.op_overdueBillEnd} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-700" />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">จำนวนเงิน (บาท) <span className="text-red-500">*</span></label>
-                <input type="number" name="amount" required value={formData.amount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
+                <input type="number" name="op_amount" required value={formData.op_amount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {formData.taskType === 'fine' && (
+          <motion.section 
+            key="fine"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
+          >
+            <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2">
+              <Gavel className="w-5 h-5 text-amber-500" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ประเภทค่าปรับ <span className="text-red-500">*</span></label>
+                <SearchableSelect 
+                  options={dropdowns.fineType} 
+                  value={formData.fn_fineType} 
+                  onChange={(val: string) => setFormData({ ...formData, fn_fineType: val })} 
+                  placeholder="เลือกประเภทค่าปรับ..."
+                  required
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
+                <input type="text" name="fn_customerName" required value={formData.fn_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง <span className="text-red-500">*</span></label>
+                <input type="text" name="fn_ReferenceNumber" required value={formData.fn_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">บิลเดือนเป็นช่วง (ตั้งแต่) <span className="text-red-500">*</span></label>
+                <input type="date" name="fn_OverdueBillStart" required value={formData.fn_OverdueBillStart} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-700" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">บิลเดือนเป็นช่วง (ถึง) <span className="text-red-500">*</span></label>
+                <input type="date" name="fn_OverdueBillEnd" required value={formData.fn_OverdueBillEnd} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-700" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ค่าเบี้ยปรับละเมิด (บาท) <span className="text-red-500">*</span></label>
+                <input type="number" name="fn_amount" required value={formData.fn_amount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-sm font-medium text-slate-700">ค่าอื่นๆ</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newFees = formData.fn_additionalFees ? [...formData.fn_additionalFees] : [];
+                      newFees.push({ name: '', amount: '' });
+                      setFormData({ ...formData, fn_additionalFees: newFees });
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-xl transition-colors font-medium"
+                  >
+                    <Plus className="w-4 h-4" /> เพิ่มค่าอื่นๆ
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {(formData.fn_additionalFees || []).map((fee: any, idx: number) => (
+                    <div key={idx} className="flex gap-3 items-end">
+                      <input
+                        type="text"
+                        placeholder="ชื่อค่าธรรมเนียม (เช่น โทษขาด)"
+                        value={fee.name || ''}
+                        onChange={(e) => {
+                          const newFees = [...(formData.fn_additionalFees || [])];
+                          newFees[idx] = { ...newFees[idx], name: e.target.value };
+                          setFormData({ ...formData, fn_additionalFees: newFees });
+                        }}
+                        className="flex-1 px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400 text-sm"
+                      />
+                      <input
+                        type="number"
+                        placeholder="จำนวนเงิน"
+                        value={fee.amount || ''}
+                        onChange={(e) => {
+                          const newFees = [...(formData.fn_additionalFees || [])];
+                          newFees[idx] = { ...newFees[idx], amount: e.target.value };
+                          setFormData({ ...formData, fn_additionalFees: newFees });
+                        }}
+                        className="w-24 px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFees = (formData.fn_additionalFees || []).filter((_: any, i: number) => i !== idx);
+                          setFormData({ ...formData, fn_additionalFees: newFees });
+                        }}
+                        className="p-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 md:col-span-2 pt-4 border-t border-slate-200">
+                <label className="text-sm font-semibold text-slate-800">รวมค่าเสียหายทั้งหมด</label>
+                <div className="text-3xl font-bold text-amber-600">
+                  {(() => {
+                    const baseFine = parseFloat(formData.fn_amount || '0') || 0;
+                    const additionalSum = (formData.fn_additionalFees || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
+                    return (baseFine + additionalSum).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  })()}
+                  {' '}<span className="text-lg">บาท</span>
+                </div>
               </div>
             </div>
           </motion.section>
@@ -297,6 +438,20 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
 // Edit Modal Component
 const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
+  // Ensure fn_additionalFees is always an array
+  const parseFnAdditionalFees = (val: any): any[] => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
   const [formData, setFormData] = useState({
     taskType: caseData.taskType || "car_crash",
     source: caseData.source || "",
@@ -313,6 +468,24 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     overdueBillStart: caseData.overdueBillStart || "",
     overdueBillEnd: caseData.overdueBillEnd || "",
     amount: caseData.amount || "",
+    additionalFees: caseData.additionalFees || [],
+    cc_licensePlate: caseData.cc_licensePlate || "",
+    cc_driverName: caseData.cc_driverName || "",
+    cc_ReferenceNumber: caseData.cc_ReferenceNumber || "",
+    cc_damageAmount: caseData.cc_damageAmount || "",
+    op_ReferenceNumber: caseData.op_ReferenceNumber || "",
+    op_customerName: caseData.op_customerName || "",
+    op_OverdueBillStart: caseData.op_OverdueBillStart || "",
+    op_overdueBillEnd: caseData.op_overdueBillEnd || "",
+    op_amount: caseData.op_amount || "",
+    fn_fineType: caseData.fn_fineType || "",
+    fn_fineTypeName: caseData.fn_fineTypeName || "",
+    fn_ReferenceNumber: caseData.fn_ReferenceNumber || "",
+    fn_OverdueBillStart: caseData.fn_OverdueBillStart || "",
+    fn_OverdueBillEnd: caseData.fn_OverdueBillEnd || "",
+    fn_amount: caseData.fn_amount || "",
+    fn_additionalFees: parseFnAdditionalFees(caseData.fn_additionalFees),
+    notes: caseData.notes || "",
   });
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -324,8 +497,22 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     try {
       const data = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
-        data.append(key, value as string);
+        if (key === 'fn_additionalFees' && Array.isArray(value)) {
+          // Serialize array to JSON string
+          data.append(key, JSON.stringify(value));
+        } else {
+          data.append(key, value as string);
+        }
       });
+      
+      // Calculate and add total fine amount (base + additional fees)
+      if (formData.taskType === 'fine') {
+        const baseFine = parseFloat(formData.fn_amount || '0') || 0;
+        const additionalSum = (formData.fn_additionalFees || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
+        const totalAmount = baseFine + additionalSum;
+        data.append('fn_totalAmount', String(totalAmount));
+      }
+      
       if (file) data.append("courtDocument", file);
 
       const response = await fetch(`/api/cases/${caseData.id}`, {
@@ -420,7 +607,8 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
   
   const typeData = [
     { name: 'รถยนต์ชนเสา', value: activeCases.filter(c => c.taskType === 'car_crash').length },
-    { name: 'ค้างชำระ', value: activeCases.filter(c => c.taskType === 'overdue_payment').length }
+    { name: 'ค่าไฟฟ้าค้างชำระ', value: activeCases.filter(c => c.taskType === 'overdue_payment').length },
+    { name: 'ค่าไฟฟ้าปรับปรุง', value: activeCases.filter(c => c.taskType === 'fine').length }
   ];
 
   const statusData = [
@@ -448,7 +636,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
           <div className="text-5xl font-bold text-blue-600">{typeData[0].value}</div>
         </div>
         <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6 flex flex-col items-center justify-center">
-          <div className="text-slate-500 font-medium mb-2">ค้างชำระ</div>
+          <div className="text-slate-500 font-medium mb-2">ค่าไฟฟ้าค้างชำระ</div>
           <div className="text-5xl font-bold text-emerald-600">{typeData[1].value}</div>
         </div>
       </div>
@@ -478,20 +666,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
           </div>
         </div>
 
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
-          <h3 className="text-lg font-semibold text-slate-800 mb-6">คดีแยกตามสถานะ</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statusData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="value" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+     
       </div>
     </div>
   );
@@ -703,9 +878,13 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
                           <Car className="w-3.5 h-3.5" /> รถชนเสา
                         </span>
+                      ) : c.taskType === 'fine' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                          <Gavel className="w-3.5 h-3.5" /> ค่าไฟฟ้าปรับปรุง
+                        </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          <CreditCard className="w-3.5 h-3.5" /> ค้างชำระ
+                          <CreditCard className="w-3.5 h-3.5" /> ค่าไฟฟ้าค้างชำระ
                         </span>
                       )}
                     </td>
@@ -797,13 +976,23 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
     returnDocNumber: '',
     taskState: '',
     lawyer: '',
-    licensePlate: '',
-    driverName: '',
-    damageAmount: '',
-    referenceNumber: '',
-    overdueBillStart: '',
-    overdueBillEnd: '',
-    amount: '',
+    cc_licensePlate: '',
+    cc_driverName: '',
+    cc_ReferenceNumber: '',
+    cc_damageAmount: '',
+    op_ReferenceNumber: '',
+    op_customerName: '',
+    op_OverdueBillStart: '',
+    op_overdueBillEnd: '',
+    op_amount: '',
+    fn_fineType: '',
+    fn_fineTypeName: '',
+    fn_ReferenceNumber: '',
+    fn_OverdueBillStart: '',
+    fn_OverdueBillEnd: '',
+    fn_amount: '',
+    fn_additionalFees: [],
+    notes: '',
   });
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -817,8 +1006,22 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
     try {
       const data = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
-        data.append(key, value as string);
+        if (key === 'fn_additionalFees' && Array.isArray(value)) {
+          // Serialize array to JSON string
+          data.append(key, JSON.stringify(value));
+        } else {
+          data.append(key, value as string);
+        }
       });
+      
+      // Calculate and add total fine amount (base + additional fees)
+      if (formData.taskType === 'fine') {
+        const baseFine = parseFloat(formData.fn_amount || '0') || 0;
+        const additionalSum = (formData.fn_additionalFees || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
+        const totalAmount = baseFine + additionalSum;
+        data.append('fn_totalAmount', String(totalAmount));
+      }
+      
       if (file) data.append('courtDocument', file);
 
       const response = await fetch('/api/cases', {
@@ -829,7 +1032,7 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
       if (response.ok) {
         setSubmitStatus('success');
         setFormData({
-          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', taskState: '', lawyer: '', licensePlate: '', driverName: '', damageAmount: '', referenceNumber: '', overdueBillStart: '', overdueBillEnd: '', amount: '',
+          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], notes: '',
         });
         setFile(null);
         onSuccess();
@@ -907,16 +1110,17 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
   const [dropdowns, setDropdowns] = useState<Dropdowns>({
-    source: [], docState: [], taskState: [], lawyer: []
+    source: [], docState: [], taskState: [], lawyer: [], fineType: []
   });
 
   const fetchData = async () => {
     try {
-      const [source, docState, taskState, lawyer, casesData] = await Promise.all([
+      const [source, docState, taskState, lawyer, fineType, casesData] = await Promise.all([
         fetch('/api/sheets/source').then(res => res.json()),
         fetch('/api/sheets/doc_state').then(res => res.json()),
         fetch('/api/sheets/task_state').then(res => res.json()),
         fetch('/api/sheets/lawyer').then(res => res.json()),
+        fetch('/api/sheets/fine_type').then(res => res.json()),
         fetch('/api/cases').then(res => res.json())
       ]);
       // Normalize responses into DropdownOption[] (id,label)
@@ -947,7 +1151,7 @@ function App() {
         return [];
       };
 
-      setDropdowns({ source: toDropdown(source), docState: toDropdown(docState), taskState: toDropdown(taskState), lawyer: toDropdown(lawyer) });
+      setDropdowns({ source: toDropdown(source), docState: toDropdown(docState), taskState: toDropdown(taskState), lawyer: toDropdown(lawyer), fineType: toDropdown(fineType) });
       setCases(casesData);
     } catch (error) {
       console.error("Failed to fetch data", error);
