@@ -5,7 +5,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { 
   FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown, 
   LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2, 
-  Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus
+  Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus,
+  User, Hash, ClipboardList, FileCheck
 } from 'lucide-react';
 
 // --- Types ---
@@ -816,13 +817,40 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
 
   const activeCases = cases.filter(c => !isArchivedValue(c.isArchived));
 
-  const filteredCases = activeCases.filter(c => 
-    (c.docNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.lawyerName || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.sourceName || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.driverName || "").toLowerCase().includes(search.toLowerCase()) ||
-    (c.referenceNumber || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const getCaseDetails = (c: any) => {
+    let name = '';
+    let referenceNumber = '';
+    let type = '';
+
+    if (c.taskType === 'car_crash') {
+      name = c.cc_driverName;
+      referenceNumber = c.cc_ReferenceNumber;
+      type = 'รถชนเสา';
+    } else if (c.taskType === 'overdue_payment') {
+      name = c.op_customerName;
+      referenceNumber = c.op_ReferenceNumber;
+      type = 'ค่าไฟฟ้าค้างชำระ';
+    } else if (c.taskType === 'fine') {
+      name = c.fn_customerName;
+      referenceNumber = c.fn_ReferenceNumber;
+      type = c.fn_fineTypeName || 'ค่าไฟฟ้าปรับปรุง';
+    }
+    return { name, referenceNumber, type };
+  };
+
+  const filteredCases = activeCases.filter(c => {
+    const details = getCaseDetails(c);
+    const searchLower = search.toLowerCase();
+    return (
+      (c.docNumber || "").toLowerCase().includes(searchLower) ||
+      (c.lawyerName || "").toLowerCase().includes(searchLower) ||
+      (c.sourceName || "").toLowerCase().includes(searchLower) ||
+      (details.name || "").toLowerCase().includes(searchLower) ||
+      (details.referenceNumber || "").toLowerCase().includes(searchLower) ||
+      (details.type || "").toLowerCase().includes(searchLower) ||
+      (c.docStateName || "").toLowerCase().includes(searchLower)
+    );
+  });
 
   const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
   const paginatedCases = filteredCases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -852,10 +880,9 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200/50 bg-slate-50/50">
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">เลขที่หนังสือ</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ประเภทคดี</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">วันที่รับเรื่อง</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ต้นทาง</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">เอกสาร</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ประเภท</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">รายละเอียด</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">สถานะงาน</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">ทนาย</th>
               </tr>
@@ -872,7 +899,16 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                     onClick={() => setSelectedCase(c)}
                     className="border-b border-slate-100 last:border-0 hover:bg-white/80 cursor-pointer transition-colors group"
                   >
-                    <td className="px-6 py-4 font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">{c.docNumber}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-800 font-medium group-hover:text-indigo-600 transition-colors">{c.docNumber}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Archive className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-500">{c.sourceName}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       {c.taskType === 'car_crash' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
@@ -880,7 +916,7 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                         </span>
                       ) : c.taskType === 'fine' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                          <Gavel className="w-3.5 h-3.5" /> ค่าไฟฟ้าปรับปรุง
+                          <Gavel className="w-3.5 h-3.5" /> {getCaseDetails(c).type}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
@@ -888,16 +924,33 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{c.receiveDate}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{c.sourceName}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-800 font-medium">{getCaseDetails(c).name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-500">{getCaseDetails(c).referenceNumber}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border
-                        ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' : 
-                          c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
-                          'bg-slate-100 text-slate-700 border-slate-200'}`}
-                      >
-                        {c.taskStateName}
-                      </span>
+                      <div className="flex items-center gap-2 mb-1">
+                        <ClipboardList className="w-4 h-4 text-slate-400" />
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border
+                          ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' : 
+                            c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
+                            'bg-slate-100 text-slate-700 border-slate-200'}`}
+                        >
+                          {c.taskStateName}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileCheck className="w-4 h-4 text-slate-400" />
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600">
+                          {c.docStateName}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{c.lawyerName}</td>
                   </tr>
@@ -1264,7 +1317,7 @@ function App() {
         <div className="absolute top-20 right-20 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 p-4 md:p-8 lg:p-12 max-w-7xl mx-auto">
+        <div className="relative z-10 p-4 md:p-8 lg:p-12 mx-auto">
         
      
 
