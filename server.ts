@@ -269,7 +269,7 @@ async function startServer() {
       headers.forEach((h, i) => {
         const raw = row[i] ?? "";
         const key = String(h).trim();
-        if (key.toLowerCase() === "isarchived" || key.toLowerCase() === "archived") {
+        if (key.toLowerCase() === "isarchived" || key.toLowerCase() === "archived" || key.toLowerCase() === "isfinish") {
           const v = String(raw).trim().toLowerCase();
           obj[key] = v === "true" || v === "1" || v === "yes";
         } else if (key === "fn_additionalFees") {
@@ -317,6 +317,7 @@ async function startServer() {
         id: newId,
         ...req.body,
         isArchived: false,
+        isFinish: false,
       };
 
       // Parse fn_additionalFees JSON string back to array
@@ -357,7 +358,7 @@ async function startServer() {
       // Append to sheet
       const sheets = await getSheetsClient();
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       console.log('Using headers for append:', effectiveHeaders);
       
@@ -443,7 +444,7 @@ async function startServer() {
       }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       const updated = { ...existing, ...updateData };
       
@@ -490,7 +491,7 @@ async function startServer() {
       const updated = { ...existing, taskState, taskStateName } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       
       // Convert fn_additionalFees array to JSON string if present
@@ -526,15 +527,19 @@ async function startServer() {
   });
 
   app.patch("/api/cases/:id/archive", express.json(), async (req, res) => {
+    const { isFinish } = req.body;
     try {
       const cases = await readSheetAsObjects('case');
       const existing = cases.find(c => String(c.id) === String(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Case not found' });
 
       const updated = { ...existing, isArchived: true } as any;
+      if (isFinish) {
+        updated.isFinish = 'TRUE';
+      }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived', 'isFinish'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       
       // Convert fn_additionalFees array to JSON string if present
@@ -566,6 +571,60 @@ async function startServer() {
     } catch (err) {
       console.error('Failed to archive case', err);
       res.status(500).json({ error: 'Failed to archive case' });
+    }
+  });
+
+  app.delete("/api/cases/:id", async (req, res) => {
+    try {
+      const cases = await readSheetAsObjects("case");
+      const existing = cases.find(c => String(c.id) === String(req.params.id));
+      if (!existing) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+  
+      const rowNum = existing.__rowNum;
+  
+      const sheets = await getSheetsClient();
+      if (sheets) {
+        // To delete a row, we need the sheetId (not the sheet name)
+        const spreadsheet = await sheets.spreadsheets.get({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+        });
+  
+        const sheet = spreadsheet.data.sheets?.find(
+          (s) => s.properties?.title === "case"
+        );
+  
+        if (sheet?.properties?.sheetId === undefined) {
+          return res.status(500).json({ error: "Could not find sheetId for 'case'" });
+        }
+        const sheetId = sheet.properties.sheetId;
+        
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          requestBody: {
+            requests: [
+              {
+                deleteDimension: {
+                  range: {
+                    sheetId: sheetId,
+                    dimension: "ROWS",
+                    startIndex: rowNum - 1,
+                    endIndex: rowNum,
+                  },
+                },
+              },
+            ],
+          },
+        });
+        
+        res.json({ success: true, message: "ลบข้อมูลสำเร็จ" });
+      } else {
+        res.status(500).json({ error: "Could not connect to Google Sheets to delete." });
+      }
+    } catch (err) {
+      console.error("Failed to delete case:", err);
+      res.status(500).json({ error: "Failed to delete case" });
     }
   });
 

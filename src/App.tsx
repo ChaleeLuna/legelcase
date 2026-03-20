@@ -9,6 +9,59 @@ import {
   User, Hash, ClipboardList, FileCheck
 } from 'lucide-react';
 
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, children, isConfirming, variant = 'danger' }: any) => {
+  if (!isOpen) return null;
+
+  const colors = {
+    danger: {
+      icon: <AlertCircle className="w-8 h-8 text-red-500" />,
+      buttonClass: 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30',
+    },
+    warning: {
+      icon: <Archive className="w-8 h-8 text-amber-500" />,
+      buttonClass: 'bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-500/30',
+    }
+  };
+
+  const selectedVariant = colors[variant as keyof typeof colors] || colors.danger;
+
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white/90 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-md p-8 border border-white/40"
+      >
+        <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-3">
+          {selectedVariant.icon}
+          {title || "ยืนยันการกระทำ"}
+        </h2>
+        <div className="text-slate-600 mb-8">
+          {children}
+        </div>
+        <div className="flex justify-end gap-3">
+          <button 
+            onClick={onClose}
+            disabled={isConfirming}
+            className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors disabled:opacity-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isConfirming}
+            className={`px-6 py-3 rounded-2xl font-medium text-white transition-all flex items-center justify-center w-32 disabled:opacity-50 ${selectedVariant.buttonClass}`}
+          >
+            {isConfirming ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'ยืนยัน'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Types ---
 type DropdownOption = { id: string; label: string };
 type Dropdowns = {
@@ -491,6 +544,10 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+  const [isFinishOnArchive, setIsFinishOnArchive] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -531,21 +588,52 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     }
   };
 
-  const handleArchive = async () => {
-    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการจัดเก็บ (Archive) คดีนี้?")) return;
+  const handleArchive = () => {
+    setIsArchiveConfirmOpen(true);
+  };
+
+  const confirmArchive = async () => {
     setIsArchiving(true);
     try {
       const response = await fetch(`/api/cases/${caseData.id}/archive`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFinish: isFinishOnArchive })
       });
       if (response.ok) {
         onSaveSuccess();
+      } else {
+        alert('Failed to archive case.');
+        console.error('Failed to archive case:', await response.text());
       }
     } catch (error) {
       console.error("Error archiving case:", error);
+      alert('An error occurred while archiving the case.');
     } finally {
       setIsArchiving(false);
+      setIsArchiveConfirmOpen(false);
+      setIsFinishOnArchive(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/cases/${caseData.id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        onSaveSuccess();
+      } else {
+        alert('Failed to delete the case.');
+        console.error('Failed to delete case:', await response.text());
+      }
+    } catch (error) {
+      alert('An error occurred while deleting the case.');
+      console.error('Error deleting case:', error);
+    } finally {
+      setIsDeleting(false);
+      setIsConfirmOpen(false);
     }
   };
 
@@ -566,9 +654,9 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
             <button 
               onClick={handleArchive} 
               disabled={isArchiving}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl transition-colors text-sm font-medium"
             >
-              <Archive className="w-4 h-4" /> {isArchiving ? "กำลังจัดเก็บ..." : "จัดเก็บ (Archive)"}
+              <Archive className="w-4 h-4" /> {isArchiving ? "กำลังจัดเก็บ..." : "จัดเก็บ"}
             </button>
             <button onClick={onClose} className="p-2 hover:bg-slate-200/50 rounded-full transition-colors">
               <X className="w-6 h-6 text-slate-500" />
@@ -589,15 +677,66 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
           </form>
         </div>
 
-        <div className="p-6 bg-white/50 border-t border-slate-200/50 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors">
-            ยกเลิก
-          </button>
-          <button type="submit" form="edit-form" disabled={isSubmitting} className="px-6 py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-70">
-            {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
-          </button>
+        <div className="p-6 bg-white/50 border-t border-slate-200/50 flex justify-between items-center">
+          <div>
+            <button
+              onClick={() => setIsConfirmOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors text-sm font-medium"
+            >
+              <Trash2 className="w-4 h-4" /> ลบ
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onClose} className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors">
+              ยกเลิก
+            </button>
+            <button type="submit" form="edit-form" disabled={isSubmitting} className="px-6 py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-70">
+              {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+            </button>
+          </div>
         </div>
       </motion.div>
+      <AnimatePresence>
+        {isConfirmOpen && (
+          <ConfirmModal
+            isOpen={isConfirmOpen}
+            onClose={() => setIsConfirmOpen(false)}
+            onConfirm={handleDelete}
+            title="ยืนยันการลบ"
+            isConfirming={isDeleting}
+          >
+            <p>คุณแน่ใจหรือไม่ว่าต้องการลบคดีนี้อย่างถาวร?</p>
+            <p className="mt-2 text-sm text-slate-500">การกระทำนี้ไม่สามารถย้อนกลับได้ และข้อมูลจะถูกลบออกจาก Google Sheet ด้วย</p>
+          </ConfirmModal>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isArchiveConfirmOpen && (
+          <ConfirmModal
+            isOpen={isArchiveConfirmOpen}
+            onClose={() => setIsArchiveConfirmOpen(false)}
+            onConfirm={confirmArchive}
+            title="ยืนยันการจัดเก็บ"
+            isConfirming={isArchiving}
+            variant="warning"
+          >
+            <p>คุณแน่ใจหรือไม่ว่าต้องการจัดเก็บ (Archive) คดีนี้?</p>
+            <div className="flex items-center gap-2 mt-4 bg-slate-100 p-3 rounded-lg">
+              <input 
+                type="checkbox"
+                id="isFinishCheckbox"
+                checked={isFinishOnArchive}
+                onChange={(e) => setIsFinishOnArchive(e.target.checked)}
+                className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="isFinishCheckbox" className="text-sm text-slate-700">
+                งานเสร็จแล้วใช่หรือไม่?
+              </label>
+            </div>
+            <p className="mt-4 text-sm text-slate-500">คุณยังสามารถค้นหาและดูคดีที่จัดเก็บไว้ได้ในภายหลัง</p>
+          </ConfirmModal>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -890,7 +1029,7 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
             <tbody>
               {paginatedCases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">ไม่พบข้อมูลคดี</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">ไม่พบข้อมูลคดี</td>
                 </tr>
               ) : (
                 paginatedCases.map((c) => (
