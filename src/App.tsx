@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -6,8 +6,15 @@ import {
   FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown, 
   LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2, 
   Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus,
-  User, Hash, ClipboardList, FileCheck
+  User, Hash, ClipboardList, FileCheck, FolderArchive, XCircle, LogOut, ShieldCheck, Clock
 } from 'lucide-react';
+
+declare const liff: any;
+
+// ── Auth Context ──────────────────────────────────────────────
+type AuthUser = { userId: string; displayName: string; pictureUrl: string; permission: number };
+const AuthContext = createContext<AuthUser | null>(null);
+const useAuth = () => useContext(AuthContext);
 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, children, isConfirming, variant = 'danger' }: any) => {
   if (!isOpen) return null;
@@ -278,7 +285,20 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium text-slate-700 ml-1">เอกสารจากศาล (อัปโหลดขึ้น Google Drive)</label>
+            <label className="text-sm font-medium text-slate-700 ml-1">เอกสารจากศาล (อัปโหลดขึ้น Supabase Storage)</label>
+            {formData.courtDocument && (
+              <div className="mb-3">
+                <a
+                  href={formData.courtDocument}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 transition-all"
+                >
+                  <FileText className="w-5 h-5" /> เปิดดูเอกสารที่อัปโหลดแล้ว
+                </a>
+                <p className="text-xs text-slate-500 mt-2">อัปโหลดไฟล์ใหม่ด้านล่างเพื่อแทนที่เอกสารเดิม</p>
+              </div>
+            )}
             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 border-dashed rounded-2xl bg-white/30 hover:bg-white/50 transition-colors relative">
               <div className="space-y-1 text-center">
                 <Upload className="mx-auto h-12 w-12 text-slate-400" />
@@ -540,6 +560,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     fn_amount: caseData.fn_amount || "",
     fn_additionalFees: parseFnAdditionalFees(caseData.fn_additionalFees),
     notes: caseData.notes || "",
+    courtDocument: caseData.courtDocument || "",
   });
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -743,70 +764,256 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
 
 // Stats Dashboard Component
 const StatsDashboard = ({ cases }: { cases: any[] }) => {
-  const activeCases = cases.filter(c => !c.isArchived);
-  
+  const isArchivedVal = (v: any) => { const s = String(v).trim().toLowerCase(); return s === 'true' || s === '1' || s === 'yes'; };
+  const activeCases = cases.filter(c => !isArchivedVal(c.isArchived));
+  const archivedCases = cases.filter(c => isArchivedVal(c.isArchived));
+
+  // Type breakdown
+  const carCrash = activeCases.filter(c => c.taskType === 'car_crash');
+  const overdue = activeCases.filter(c => c.taskType === 'overdue_payment');
+  const fine = activeCases.filter(c => c.taskType === 'fine');
+
+  // Status breakdown
+  const byStatus = (name: string) => activeCases.filter(c => c.taskStateName === name).length;
+
+  // Financial totals
+  const totalCarDamage = carCrash.reduce((s, c) => s + (parseFloat(c.cc_damageAmount) || 0), 0);
+  const totalOverdue = overdue.reduce((s, c) => s + (parseFloat(c.op_amount) || 0), 0);
+  const totalFine = fine.reduce((s, c) => s + (parseFloat(c.fn_totalAmount) || parseFloat(c.fn_amount) || 0), 0);
+  const grandTotal = totalCarDamage + totalOverdue + totalFine;
+
+  // Lawyer workload
+  const lawyerMap: Record<string, number> = {};
+  activeCases.forEach(c => { if (c.lawyerName) lawyerMap[c.lawyerName] = (lawyerMap[c.lawyerName] || 0) + 1; });
+  const lawyerData = Object.entries(lawyerMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+
+  // Source breakdown
+  const sourceMap: Record<string, number> = {};
+  activeCases.forEach(c => { if (c.sourceName) sourceMap[c.sourceName] = (sourceMap[c.sourceName] || 0) + 1; });
+  const sourceData = Object.entries(sourceMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+
   const typeData = [
-    { name: 'รถยนต์ชนเสา', value: activeCases.filter(c => c.taskType === 'car_crash').length },
-    { name: 'ค่าไฟฟ้าค้างชำระ', value: activeCases.filter(c => c.taskType === 'overdue_payment').length },
-    { name: 'ค่าไฟฟ้าปรับปรุง', value: activeCases.filter(c => c.taskType === 'fine').length }
+    { name: 'รถยนต์ชนเสา', value: carCrash.length },
+    { name: 'ค่าไฟฟ้าค้างชำระ', value: overdue.length },
+    { name: 'ค่าไฟฟ้าปรับปรุง', value: fine.length },
   ];
 
-  const statusData = [
-    { name: 'รับเรื่อง', value: activeCases.filter(c => c.taskStateName === 'รับเรื่อง').length },
-    { name: 'กำลังดำเนินการ', value: activeCases.filter(c => c.taskStateName === 'กำลังดำเนินการ').length },
-    { name: 'เสร็จสิ้น', value: activeCases.filter(c => c.taskStateName === 'เสร็จสิ้น').length }
+  const statusChartData = [
+    { name: 'รับเรื่อง', value: byStatus('รับเรื่อง'), color: '#3b82f6' },
+    { name: 'กำลังดำเนินการ', value: byStatus('กำลังดำเนินการ'), color: '#f59e0b' },
+    { name: 'เสร็จสิ้น', value: byStatus('เสร็จสิ้น'), color: '#10b981' },
   ];
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+  const TYPE_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
+  const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+  const StatCard = ({ icon, label, value, sub, color }: any) => (
+    <div className={`bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6 flex items-center gap-4`}>
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm text-slate-500 font-medium">{label}</p>
+        <p className="text-3xl font-bold text-slate-800 leading-tight">{value}</p>
+        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 tracking-tight">สถิติภาพรวม</h2>
-        <p className="text-slate-500 mt-2">ข้อมูลสรุปคดีที่กำลังดำเนินการในระบบ</p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h2 className="text-3xl font-bold text-slate-800 tracking-tight">แดชบอร์ด</h2>
+        <p className="text-slate-500 mt-1">ภาพรวมระบบจัดการคดีทั้งหมด</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6 flex flex-col items-center justify-center">
-          <div className="text-slate-500 font-medium mb-2">คดีทั้งหมด (Active)</div>
-          <div className="text-5xl font-bold text-slate-800">{activeCases.length}</div>
+      {/* ── ส่วนผู้บริหาร ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
+          <h3 className="text-base font-semibold text-slate-700">ภาพรวมสำหรับผู้บริหาร</h3>
         </div>
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6 flex flex-col items-center justify-center">
-          <div className="text-slate-500 font-medium mb-2">รถยนต์ชนเสา</div>
-          <div className="text-5xl font-bold text-blue-600">{typeData[0].value}</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={<LayoutDashboard className="w-7 h-7 text-indigo-600" />} label="คดีที่กำลังดำเนินการ" value={activeCases.length} sub={`จัดเก็บแล้ว ${archivedCases.length} คดี`} color="bg-indigo-50" />
+          <StatCard icon={<Car className="w-7 h-7 text-blue-600" />} label="รถยนต์ชนเสา" value={carCrash.length} sub={`${fmt(totalCarDamage)} บาท`} color="bg-blue-50" />
+          <StatCard icon={<CreditCard className="w-7 h-7 text-emerald-600" />} label="ค่าไฟฟ้าค้างชำระ" value={overdue.length} sub={`${fmt(totalOverdue)} บาท`} color="bg-emerald-50" />
+          <StatCard icon={<Gavel className="w-7 h-7 text-amber-600" />} label="ค่าไฟฟ้าปรับปรุง" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
         </div>
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6 flex flex-col items-center justify-center">
-          <div className="text-slate-500 font-medium mb-2">ค่าไฟฟ้าค้างชำระ</div>
-          <div className="text-5xl font-bold text-emerald-600">{typeData[1].value}</div>
+
+        {/* มูลค่ารวม */}
+        <div className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <p className="text-indigo-100 text-sm font-medium">มูลค่าความเสียหายรวมทั้งหมด (Active)</p>
+            <p className="text-4xl font-bold mt-1">{fmt(grandTotal)} <span className="text-2xl font-normal text-indigo-200">บาท</span></p>
+          </div>
+          <div className="flex gap-6 text-center">
+            <div><p className="text-indigo-200 text-xs">รถชน</p><p className="text-xl font-bold">{fmt(totalCarDamage)}</p></div>
+            <div className="w-px bg-indigo-400/50" />
+            <div><p className="text-indigo-200 text-xs">ค่าไฟค้าง</p><p className="text-xl font-bold">{fmt(totalOverdue)}</p></div>
+            <div className="w-px bg-indigo-400/50" />
+            <div><p className="text-indigo-200 text-xs">ค่าปรับ</p><p className="text-xl font-bold">{fmt(totalFine)}</p></div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pie - ประเภทคดี */}
         <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
-          <h3 className="text-lg font-semibold text-slate-800 mb-6">สัดส่วนประเภทคดี</h3>
-          <div className="h-64">
+          <h4 className="text-sm font-semibold text-slate-700 mb-4">สัดส่วนประเภทคดี</h4>
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={typeData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value">
-                  {typeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                <Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={4} dataKey="value">
+                  {typeData.map((_, i) => <Cell key={i} fill={TYPE_COLORS[i]} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(v: any) => [`${v} คดี`]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex justify-center gap-4 mt-4">
-            {typeData.map((entry, index) => (
-              <div key={entry.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span className="text-sm text-slate-600">{entry.name}</span>
+          <div className="space-y-2 mt-2">
+            {typeData.map((d, i) => (
+              <div key={d.name} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TYPE_COLORS[i] }} />
+                  <span className="text-slate-600">{d.name}</span>
+                </div>
+                <span className="font-semibold text-slate-800">{d.value}</span>
               </div>
             ))}
           </div>
         </div>
 
-     
+        {/* Bar - สถานะงาน */}
+        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
+          <h4 className="text-sm font-semibold text-slate-700 mb-4">สถานะงาน</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={statusChartData} barSize={32}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip formatter={(v: any) => [`${v} คดี`]} />
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {statusChartData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-2 mt-2">
+            {statusChartData.map(d => (
+              <div key={d.name} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                  <span className="text-slate-600">{d.name}</span>
+                </div>
+                <span className="font-semibold text-slate-800">{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ต้นทาง */}
+        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
+          <h4 className="text-sm font-semibold text-slate-700 mb-4">คดีตามต้นทาง</h4>
+          {sourceData.length === 0 ? (
+            <p className="text-slate-400 text-sm text-center mt-8">ไม่มีข้อมูล</p>
+          ) : (
+            <div className="space-y-3 mt-2">
+              {sourceData.map((s, i) => {
+                const pct = activeCases.length > 0 ? Math.round((s.value / activeCases.length) * 100) : 0;
+                const colors = ['bg-indigo-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500'];
+                return (
+                  <div key={s.name}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-600 truncate max-w-[160px]">{s.name}</span>
+                      <span className="font-semibold text-slate-800 shrink-0 ml-2">{s.value} ({pct}%)</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${colors[i % colors.length]} transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── ส่วนผู้ปฏิบัติงาน ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full" />
+          <h3 className="text-base font-semibold text-slate-700">ภาพรวมสำหรับผู้ปฏิบัติงาน</h3>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ภาระงานทนาย */}
+          <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
+            <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400" /> ภาระงานแต่ละทนาย
+            </h4>
+            {lawyerData.length === 0 ? (
+              <p className="text-slate-400 text-sm text-center mt-4">ไม่มีข้อมูล</p>
+            ) : (
+              <div className="space-y-3">
+                {lawyerData.map((l, i) => {
+                  const pct = activeCases.length > 0 ? Math.round((l.count / activeCases.length) * 100) : 0;
+                  return (
+                    <div key={l.name} className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{i + 1}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-700 font-medium truncate">{l.name}</span>
+                          <span className="text-slate-500 shrink-0 ml-2">{l.count} คดี</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* คดีที่ต้องติดตาม */}
+          <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
+            <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-slate-400" /> คดีที่ต้องติดตาม (ยังไม่เสร็จ)
+            </h4>
+            {(() => {
+              const pending = activeCases.filter(c => c.taskStateName !== 'เสร็จสิ้น').slice(0, 6);
+              if (pending.length === 0) return <p className="text-slate-400 text-sm text-center mt-4">ไม่มีคดีค้างดำเนินการ 🎉</p>;
+              return (
+                <div className="space-y-2">
+                  {pending.map(c => {
+                    const name = c.taskType === 'car_crash' ? c.cc_driverName : c.taskType === 'overdue_payment' ? c.op_customerName : c.fn_customerName;
+                    return (
+                      <div key={c.id} className="flex items-center justify-between p-3 bg-white/60 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {c.taskType === 'car_crash' ? <Car className="w-4 h-4 text-blue-400 shrink-0" /> : c.taskType === 'fine' ? <Gavel className="w-4 h-4 text-amber-400 shrink-0" /> : <CreditCard className="w-4 h-4 text-emerald-400 shrink-0" />}
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">{c.docNumber}</p>
+                            <p className="text-xs text-slate-400 truncate">{name || '-'}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>{c.taskStateName || '-'}</span>
+                          <span className="text-xs text-slate-400">{c.lawyerName || '-'}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {activeCases.filter(c => c.taskStateName !== 'เสร็จสิ้น').length > 6 && (
+                    <p className="text-xs text-slate-400 text-center pt-1">และอีก {activeCases.filter(c => c.taskStateName !== 'เสร็จสิ้น').length - 6} คดี...</p>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -936,6 +1143,404 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
         )}
       </AnimatePresence>
     </div>
+  );
+};
+
+// Case Detail Modal (Read-only)
+const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; onClose: () => void; onUnarchive?: () => void }) => {
+  const [isUnarchiving, setIsUnarchiving] = useState(false);
+
+  const handleUnarchive = async () => {
+    setIsUnarchiving(true);
+    try {
+      const res = await fetch(`/api/cases/${caseData.id}/unarchive`, { method: 'PATCH' });
+      if (res.ok) {
+        onUnarchive?.();
+        onClose();
+      } else {
+        alert('เกิดข้อผิดพลาดในการยกเลิกการจัดเก็บ');
+      }
+    } catch {
+      alert('เกิดข้อผิดพลาด');
+    } finally {
+      setIsUnarchiving(false);
+    }
+  };
+  const Field = ({ label, value }: { label: string; value?: string }) => (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className="text-sm text-slate-800 font-medium bg-white/60 px-3 py-2 rounded-xl border border-slate-100">{value || '-'}</p>
+    </div>
+  );
+
+  const parseFees = (val: any): any[] => {
+    if (Array.isArray(val)) return val;
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 bg-white/50 border-b border-slate-200/50">
+          <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
+            <FolderArchive className="w-5 h-5 text-indigo-500" />
+            รายละเอียดคดี {caseData.docNumber}
+          </h2>
+          <div className="flex items-center gap-2">
+            {caseData.isFinish ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                <CheckCircle2 className="w-3.5 h-3.5" /> เสร็จสิ้นแล้ว
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                <XCircle className="w-3.5 h-3.5" /> ยังไม่เสร็จ
+              </span>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-slate-200/50 rounded-full transition-colors">
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* General Info */}
+          <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-indigo-400" /> ข้อมูลทั่วไป
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="ประเภทงาน" value={caseData.taskType === 'car_crash' ? 'รถยนต์ชนเสา' : caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' : 'ค่าไฟฟ้าปรับปรุง'} />
+              <Field label="ต้นทางเอกสาร" value={caseData.sourceName} />
+              <Field label="วันที่รับเรื่อง" value={caseData.receiveDate} />
+              <Field label="เลขที่หนังสือ" value={caseData.docNumber} />
+              <Field label="ผลการตรวจเอกสาร" value={caseData.docStateName} />
+              <Field label="เลขที่คืนเอกสาร" value={caseData.returnDocNumber} />
+              <Field label="สถานะงาน" value={caseData.taskStateName} />
+              <Field label="ผู้รับผิดชอบ" value={caseData.lawyerName} />
+              {caseData.notes && <div className="sm:col-span-2"><Field label="หมายเหตุ" value={caseData.notes} /></div>}
+              {caseData.courtDocument && (
+                <div className="sm:col-span-2 space-y-1">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">เอกสารจากศาล</p>
+                  <a
+                    href={caseData.courtDocument}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-xl border border-indigo-100 transition-colors font-medium"
+                  >
+                    <FileText className="w-4 h-4" /> เปิดเอกสาร (Google Drive)
+                  </a>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Type-specific Info */}
+          {caseData.taskType === 'car_crash' && (
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <Car className="w-4 h-4 text-blue-400" /> ข้อมูลคดีรถยนต์ชนเสา
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="ทะเบียนรถ" value={caseData.cc_licensePlate} />
+                <Field label="ชื่อ-นามสกุล คนขับ / ประกัน" value={caseData.cc_driverName} />
+                <Field label="หมายเลขอ้างอิง (CA)" value={caseData.cc_ReferenceNumber} />
+                <Field label="ยอดเสียหาย (บาท)" value={caseData.cc_damageAmount ? Number(caseData.cc_damageAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+              </div>
+            </section>
+          )}
+
+          {caseData.taskType === 'overdue_payment' && (
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-400" /> ข้อมูลคดีค่าไฟฟ้าค้างชำระ
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="เลขที่อ้างอิง (CA)" value={caseData.op_ReferenceNumber} />
+                <Field label="ชื่อนามสกุล" value={caseData.op_customerName} />
+                <Field label="บิลที่ค้าง (ตั้งแต่)" value={caseData.op_OverdueBillStart} />
+                <Field label="บิลที่ค้าง (ถึง)" value={caseData.op_overdueBillEnd} />
+                <Field label="จำนวนเงิน (บาท)" value={caseData.op_amount ? Number(caseData.op_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+              </div>
+            </section>
+          )}
+
+          {caseData.taskType === 'fine' && (
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <Gavel className="w-4 h-4 text-amber-400" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="ประเภทค่าปรับ" value={caseData.fn_fineTypeName} />
+                <Field label="ชื่อนามสกุล" value={caseData.fn_customerName} />
+                <Field label="หมายเลขอ้างอิง (CA)" value={caseData.fn_ReferenceNumber} />
+                <Field label="บิลเดือน (ตั้งแต่)" value={caseData.fn_OverdueBillStart} />
+                <Field label="บิลเดือน (ถึง)" value={caseData.fn_OverdueBillEnd} />
+                <Field label="ค่าเบี้ยปรับ (บาท)" value={caseData.fn_amount ? Number(caseData.fn_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+                {parseFees(caseData.fn_additionalFees).length > 0 && (
+                  <div className="sm:col-span-2 space-y-1">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">ค่าอื่นๆ</p>
+                    <div className="space-y-1">
+                      {parseFees(caseData.fn_additionalFees).map((fee: any, i: number) => (
+                        <div key={i} className="flex justify-between text-sm bg-white/60 px-3 py-2 rounded-xl border border-slate-100">
+                          <span className="text-slate-700">{fee.name}</span>
+                          <span className="font-medium text-slate-800">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {caseData.fn_totalAmount && (
+                  <div className="sm:col-span-2 pt-3 border-t border-slate-200">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">รวมทั้งหมด</p>
+                    <p className="text-2xl font-bold text-amber-600">{Number(caseData.fn_totalAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-5 bg-white/50 border-t border-slate-200/50 flex justify-between items-center">
+          {onUnarchive && (
+            <button
+              onClick={handleUnarchive}
+              disabled={isUnarchiving}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50"
+            >
+              <Archive className="w-4 h-4" />
+              {isUnarchiving ? 'กำลังดำเนินการ...' : 'ยกเลิกการจัดเก็บ'}
+            </button>
+          )}
+          <button onClick={onClose} className="px-6 py-2.5 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors">
+            ปิด
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// Archived View Component
+const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
+  const [archivedCases, setArchivedCases] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedCase, setSelectedCase] = useState<any>(null);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setLoading(true);
+    fetch('/api/cases/archived')
+      .then(res => res.json())
+      .then(data => { setArchivedCases(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = archivedCases.filter(c => {
+    const q = search.toLowerCase();
+    return (
+      (c.docNumber || '').toLowerCase().includes(q) ||
+      (c.lawyerName || '').toLowerCase().includes(q) ||
+      (c.sourceName || '').toLowerCase().includes(q) ||
+      (c.cc_driverName || '').toLowerCase().includes(q) ||
+      (c.op_customerName || '').toLowerCase().includes(q) ||
+      (c.fn_customerName || '').toLowerCase().includes(q)
+    );
+  });
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const getCaseDetails = (c: any) => {
+    if (c.taskType === 'car_crash') return { name: c.cc_driverName || '-', ref: c.cc_ReferenceNumber || '-', type: 'รถชนเสา' };
+    if (c.taskType === 'overdue_payment') return { name: c.op_customerName || '-', ref: c.op_ReferenceNumber || '-', type: 'ค่าไฟฟ้าค้างชำระ' };
+    return { name: c.fn_customerName || '-', ref: c.fn_ReferenceNumber || '-', type: c.fn_fineTypeName || 'ค่าปรับ' };
+  };
+
+  return (
+    <>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">เอกสารคดีที่จัดเก็บแล้ว</h2>
+          <p className="text-slate-500 mt-1">รายการคดีที่ถูก Archive ทั้งหมด ({filtered.length} รายการ)</p>
+        </div>
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="ค้นหาเลขที่หนังสือ, ทนาย, ต้นทาง..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            className="w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-md border border-white/40 shadow-sm rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200/50 bg-slate-50/50">
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">เอกสาร</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ประเภท</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">รายละเอียด</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">สถานะงาน</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ทนาย</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">isFinish</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="flex items-center justify-center gap-2 text-slate-400">
+                      <div className="w-5 h-5 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
+                      <span>กำลังโหลดข้อมูล...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <FolderArchive className="w-12 h-12 text-slate-300" />
+                      <span>ไม่พบข้อมูลเอกสารที่จัดเก็บแล้ว</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((c) => {
+                  const details = getCaseDetails(c);
+                  return (
+                    <tr key={c.id} onClick={() => setSelectedCase(c)} className="border-b border-slate-100 last:border-0 hover:bg-white/80 cursor-pointer transition-colors group">
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className="w-4 h-4 text-slate-400" />
+                          <span className="text-slate-800 font-medium">{c.docNumber || '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Archive className="w-4 h-4 text-slate-400" />
+                          <span className="text-slate-500">{c.sourceName || '-'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {c.taskType === 'car_crash' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                            <Car className="w-3.5 h-3.5" /> รถชนเสา
+                          </span>
+                        ) : c.taskType === 'fine' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                            <Gavel className="w-3.5 h-3.5" /> {details.type}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            <CreditCard className="w-3.5 h-3.5" /> ค่าไฟฟ้าค้างชำระ
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <div className="flex items-center gap-2 mb-1">
+                          <User className="w-4 h-4 text-slate-400" />
+                          <span className="text-slate-800 font-medium">{details.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Hash className="w-4 h-4 text-slate-400" />
+                          <span className="text-slate-500">{details.ref}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <ClipboardList className="w-4 h-4 text-slate-400" />
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border
+                            ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' :
+                              c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                              'bg-slate-100 text-slate-700 border-slate-200'}`}
+                          >
+                            {c.taskStateName || '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileCheck className="w-4 h-4 text-slate-400" />
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600">
+                            {c.docStateName || '-'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{c.lawyerName || '-'}</td>
+                      <td className="px-6 py-4">
+                        {c.isFinish ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> เสร็จสิ้นแล้ว
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                            <XCircle className="w-3.5 h-3.5" /> ยังไม่เสร็จ
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-sm text-slate-500">
+              แสดง {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} จาก {filtered.length} รายการ
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium text-slate-700 px-2">{currentPage} / {totalPages}</span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <AnimatePresence>
+      {selectedCase && (
+        <CaseDetailModal
+            caseData={selectedCase}
+            onClose={() => setSelectedCase(null)}
+            onUnarchive={() => {
+              setSelectedCase(null);
+              setLoading(true);
+              fetch('/api/cases/archived')
+                .then(r => r.json())
+                .then(data => { setArchivedCases(Array.isArray(data) ? data : []); setLoading(false); })
+                .catch(() => setLoading(false));
+              onUpdate();
+            }}
+          />
+      )}
+    </AnimatePresence>
+  </>
   );
 };
 
@@ -1297,13 +1902,54 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
 
 // Main App Component
 function App() {
-  const [currentView, setCurrentView] = useState<'stats' | 'list' | 'kanban' | 'create'>('stats');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authStatus, setAuthStatus] = useState<'loading' | 'pending' | 'approved' | 'error'>('loading');
+  const [currentView, setCurrentView] = useState<'stats' | 'list' | 'kanban' | 'create' | 'archived'>('stats');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
   const [dropdowns, setDropdowns] = useState<Dropdowns>({
     source: [], docState: [], taskState: [], lawyer: [], fineType: []
   });
+
+  useEffect(() => {
+    const liffId = import.meta.env.VITE_LIFF_ID || (window as any).__LIFF_ID__;
+    const envLiffId = '2009414446-4CvOZQML'; // fallback from .env.local
+    initLiff(liffId || envLiffId);
+  }, []);
+
+  const initLiff = async (liffId: string) => {
+    try {
+      await liff.init({ liffId });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      const profile = await liff.getProfile();
+      const res = await fetch('/api/auth/line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.userId,
+          displayName: profile.displayName,
+          pictureUrl: profile.pictureUrl,
+          statusMessage: profile.statusMessage || '',
+        }),
+      });
+      const data = await res.json();
+      const user: AuthUser = {
+        userId: profile.userId,
+        displayName: profile.displayName,
+        pictureUrl: profile.pictureUrl,
+        permission: data.permission ?? 0,
+      };
+      setAuthUser(user);
+      setAuthStatus(data.permission === 1 ? 'approved' : 'pending');
+    } catch (err) {
+      console.error('LIFF init error:', err);
+      setAuthStatus('error');
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -1354,13 +2000,67 @@ function App() {
     fetchData();
   }, []);
 
+  // Early returns for auth states (after all hooks)
+  if (authStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+          <p className="text-slate-500 font-medium">กำลังตรวจสอบสิทธิ์...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === 'error') {
+    return (
+      <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center p-6">
+        <div className="bg-white/80 rounded-3xl p-8 text-center max-w-sm shadow-xl">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">เกิดข้อผิดพลาด</h2>
+          <p className="text-slate-500 text-sm mb-6">ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาเปิดผ่าน LINE แอพ</p>
+          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-indigo-500 text-white rounded-2xl font-medium hover:bg-indigo-600 transition-colors">
+            ลองใหม่
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 flex items-center justify-center p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 text-center max-w-sm w-full shadow-2xl border border-white/40">
+          {authUser?.pictureUrl && (
+            <img src={authUser.pictureUrl} alt="profile" className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-white shadow-lg" />
+          )}
+          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock className="w-8 h-8 text-amber-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">รอตรวจสอบสิทธิ์</h2>
+          <p className="text-slate-500 text-sm mb-2">สวัสดี <span className="font-semibold text-slate-700">{authUser?.displayName}</span></p>
+          <p className="text-slate-400 text-sm mb-6">บัญชีของคุณอยู่ระหว่างรอการอนุมัติจากผู้ดูแลระบบ กรุณารอสักครู่</p>
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-left mb-6">
+            <p className="text-xs text-amber-700 font-medium">ข้อมูลที่ส่งให้ผู้ดูแล</p>
+            <p className="text-xs text-amber-600 mt-1">User ID: {authUser?.userId}</p>
+          </div>
+          <button onClick={() => window.location.reload()} className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl font-medium hover:from-indigo-600 hover:to-purple-600 transition-all shadow-lg shadow-indigo-500/30">
+            ตรวจสอบสถานะอีกครั้ง
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   const navItems = [
     { id: 'stats', label: 'สถิติภาพรวม', icon: BarChart2 },
     { id: 'list', label: 'รายการคดี', icon: LayoutDashboard },
     { id: 'create', label: 'สร้างรายการใหม่', icon: PlusCircle },
+    { id: 'archived', label: 'เอกสารคดีที่จัดเก็บแล้ว', icon: FolderArchive },
   ];
 
   return (
+    <AuthContext.Provider value={authUser}>
     <div className="min-h-screen bg-[#F2F2F7] flex font-sans selection:bg-blue-200">
       {/* Sidebar (Desktop) */}
       <aside 
@@ -1400,13 +2100,38 @@ function App() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-200/50 flex justify-center">
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-          </button>
+        <div className="p-4 border-t border-slate-200/50 flex flex-col gap-2">
+          {/* User profile */}
+          {!isSidebarCollapsed && authUser && (
+            <div className="flex items-center gap-3 px-2 py-2">
+              {authUser.pictureUrl
+                ? <img src={authUser.pictureUrl} alt="profile" className="w-8 h-8 rounded-full shrink-0" />
+                : <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><User className="w-4 h-4 text-indigo-500" /></div>
+              }
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-700 truncate">{authUser.displayName}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                  <p className="text-xs text-emerald-600">อนุมัติแล้ว</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={() => { try { liff.logout(); } catch {} window.location.reload(); }}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+              title="ออกจากระบบ"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -1471,11 +2196,13 @@ function App() {
               {currentView === 'stats' && <StatsDashboard cases={cases} />}
               {currentView === 'list' && <ListView cases={cases} dropdowns={dropdowns} onUpdate={fetchData} />}
               {currentView === 'create' && <CreateForm dropdowns={dropdowns} onSuccess={fetchData} />}
+              {currentView === 'archived' && <ArchivedView onUpdate={fetchData} />}
             </motion.div>
           </AnimatePresence>
         </div>
       </main>
     </div>
+    </AuthContext.Provider>
   );
 }
 

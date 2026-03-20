@@ -18,6 +18,47 @@ dotenv.config({ path: ".env.local" });
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_BUCKET = 'legalcase-documents';
+
+// Upload a file buffer to Supabase Storage and return the public URL
+async function uploadFileToSupabase(fileBuffer: Buffer, fileName: string, mimeType: string): Promise<string | null> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    console.error('Supabase upload: SUPABASE_URL or SUPABASE_SERVICE_KEY not set');
+    return null;
+  }
+  try {
+    // Use unique filename to avoid collisions
+    const uniqueName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    console.log(`Supabase upload: uploading "${uniqueName}" to bucket "${SUPABASE_BUCKET}"`);
+
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${uniqueName}`;
+    const resp = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Content-Type': mimeType,
+        'x-upsert': 'true',
+      },
+      body: new Uint8Array(fileBuffer),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error('Supabase upload failed:', resp.status, text);
+      return null;
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${uniqueName}`;
+    console.log('Supabase upload success:', publicUrl);
+    return publicUrl;
+  } catch (err: any) {
+    console.error('Supabase upload error:', err?.message || err);
+    return null;
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -29,6 +70,78 @@ async function startServer() {
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // LINE Login - check or register user, return permission
+  app.post("/api/auth/line", express.json(), async (req, res) => {
+    const { userId, displayName, pictureUrl, statusMessage } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+
+    try {
+      const sheets = await getSheetsClient();
+      if (!sheets) return res.status(500).json({ error: "Sheets client unavailable" });
+
+      // Read existing users
+      let values: any[][] = [];
+      try {
+        const resp = await sheets.spreadsheets.values.get({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: "User!A:F",
+        });
+        values = resp.data.values || [];
+      } catch {
+        // Sheet may not exist yet, will be created on first write
+        values = [];
+      }
+
+      const headers = values.length > 0 ? values[0] : ["user_id", "account_name", "picture_url", "status_message", "permission", "created_at"];
+      const rows = values.slice(1);
+
+      // Find existing user
+      const userIdIdx = headers.indexOf("user_id");
+      const permIdx = headers.indexOf("permission");
+      const existing = rows.find(r => r[userIdIdx] === userId);
+
+      if (existing) {
+        const permission = parseInt(existing[permIdx] ?? "0", 10);
+        return res.json({ permission, isNew: false });
+      }
+
+      // New user - append to sheet
+      const now = new Date().toISOString();
+      const newRow = headers.map((h: string) => {
+        if (h === "user_id") return userId;
+        if (h === "account_name") return displayName || "";
+        if (h === "picture_url") return pictureUrl || "";
+        if (h === "status_message") return statusMessage || "";
+        if (h === "permission") return "0";
+        if (h === "created_at") return now;
+        return "";
+      });
+
+      // If sheet is empty, write header first
+      if (values.length === 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: "User!A1",
+          valueInputOption: "RAW",
+          requestBody: { values: [headers, newRow] },
+        });
+      } else {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: "User!A:F",
+          valueInputOption: "RAW",
+          insertDataOption: "INSERT_ROWS",
+          requestBody: { values: [newRow] },
+        });
+      }
+
+      return res.json({ permission: 0, isNew: true });
+    } catch (err: any) {
+      console.error("LINE auth error:", err?.message || err);
+      res.status(500).json({ error: "Auth failed" });
+    }
   });
 
   // API for Google Sheets data (falls back to mock data)
@@ -300,6 +413,18 @@ async function startServer() {
     }
   });
 
+  // GET archived cases
+  app.get("/api/cases/archived", async (req, res) => {
+    try {
+      const cases = await readSheetAsObjects("case");
+      const archivedCases = cases.filter(c => c.isArchived);
+      res.json(archivedCases);
+    } catch (err) {
+      console.error("Failed to load archived cases from sheet:", err);
+      res.status(500).json({ error: "Failed to load archived cases" });
+    }
+  });
+
   app.post("/api/cases", upload.single("courtDocument"), async (req, res) => {
     console.log("Received case data:", req.body);
     if (req.file) {
@@ -321,6 +446,12 @@ async function startServer() {
         isArchived: false,
         isFinish: false,
       };
+
+      // Upload court document to Google Drive if provided
+      if (req.file) {
+        const driveLink = await uploadFileToSupabase(req.file.buffer, req.file.originalname, req.file.mimetype);
+        if (driveLink) newCase.courtDocument = driveLink;
+      }
 
       // Parse fn_additionalFees JSON string back to array
       if (typeof newCase.fn_additionalFees === 'string') {
@@ -360,7 +491,7 @@ async function startServer() {
       // Append to sheet
       const sheets = await getSheetsClient();
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       console.log('Using headers for append:', effectiveHeaders);
       
@@ -412,6 +543,12 @@ async function startServer() {
     try {
       const updateData: any = { ...req.body };
 
+      // Upload court document to Google Drive if a new file is provided
+      if (req.file) {
+        const driveLink = await uploadFileToSupabase(req.file.buffer, req.file.originalname, req.file.mimetype);
+        if (driveLink) updateData.courtDocument = driveLink;
+      }
+
       // Parse fn_additionalFees JSON string back to array
       if (typeof updateData.fn_additionalFees === 'string') {
         try {
@@ -446,7 +583,7 @@ async function startServer() {
       }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       const updated = { ...existing, ...updateData };
       
@@ -493,7 +630,7 @@ async function startServer() {
       const updated = { ...existing, taskState, taskStateName } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       
       // Convert fn_additionalFees array to JSON string if present
@@ -541,7 +678,7 @@ async function startServer() {
       }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived', 'isFinish'];
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
       const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
       
       // Convert fn_additionalFees array to JSON string if present
@@ -573,6 +710,49 @@ async function startServer() {
     } catch (err) {
       console.error('Failed to archive case', err);
       res.status(500).json({ error: 'Failed to archive case' });
+    }
+  });
+
+  app.patch("/api/cases/:id/unarchive", express.json(), async (req, res) => {
+    try {
+      const cases = await readSheetAsObjects('case');
+      const existing = cases.find(c => String(c.id) === String(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Case not found' });
+
+      const updated = { ...existing, isArchived: false, isFinish: false } as any;
+      const rowNum = existing.__rowNum;
+      const headers = await getSheetHeaders('case');
+      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
+      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+
+      if (Array.isArray(updated.fn_additionalFees)) {
+        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      }
+
+      const row = effectiveHeaders.map(h => updated[h] ?? '');
+
+      const sheets = await getSheetsClient();
+      if (sheets) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: GOOGLE_SHEET_ID!,
+          range: `case!A${rowNum}:AZ${rowNum}`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [row] },
+        });
+      } else if (GOOGLE_API_KEY) {
+        const range = `case!A${rowNum}:AZ${rowNum}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
+        await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] })
+        });
+      }
+
+      res.json({ success: true, message: "ยกเลิกการจัดเก็บสำเร็จ" });
+    } catch (err) {
+      console.error('Failed to unarchive case', err);
+      res.status(500).json({ error: 'Failed to unarchive case' });
     }
   });
 
