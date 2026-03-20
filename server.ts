@@ -213,7 +213,7 @@ async function startServer() {
     const sheets = await getSheetsClient();
     if (sheets) {
       try {
-        const range = `${sheetName}!A:AE`;
+        const range = `${sheetName}!A:AZ`;
         const resp = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID!, range });
         const values: string[][] = resp.data.values || [];
         if (values.length === 0) return [];
@@ -254,7 +254,7 @@ async function startServer() {
     const sheets = await getSheetsClient();
     if (!sheets) return [];
 
-    const range = `${sheetName}!A:AE`;
+    const range = `${sheetName}!A:AZ`;
     const resp = await sheets.spreadsheets.values.get({
       spreadsheetId: GOOGLE_SHEET_ID!,
       range,
@@ -291,7 +291,9 @@ async function startServer() {
   app.get("/api/cases", async (req, res) => {
     try {
       const cases = await readSheetAsObjects("case");
-      res.json(cases);
+      console.log(cases)
+      const activeCases = cases.filter(c => !c.isArchived);
+      res.json(activeCases);
     } catch (err) {
       console.error("Failed to load cases from sheet:", err);
       res.status(500).json({ error: "Failed to load cases" });
@@ -374,7 +376,7 @@ async function startServer() {
       if (sheets) {
         const appendResp = await sheets.spreadsheets.values.append({
           spreadsheetId: GOOGLE_SHEET_ID!,
-          range: 'case!A:AE',
+          range: 'case!A:AZ',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: [row] }
@@ -382,7 +384,7 @@ async function startServer() {
         console.log('Sheets append response status:', appendResp?.status);
         console.log('Sheets append response data:', appendResp?.data);
       } else if (GOOGLE_API_KEY) {
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/case!A:AE:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${GOOGLE_API_KEY}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/case!A:AZ:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${GOOGLE_API_KEY}`;
         const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
