@@ -1914,7 +1914,7 @@ function App() {
 
   useEffect(() => {
     const liffId = import.meta.env.VITE_LIFF_ID || (window as any).__LIFF_ID__;
-    const envLiffId = '2009414446-4CvOZQML'; // fallback from .env.local
+    const envLiffId = import.meta.env.NEXT_PUBLIC_LIFF_ID
     initLiff(liffId || envLiffId);
   }, []);
 
