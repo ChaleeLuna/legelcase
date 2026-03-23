@@ -23,18 +23,35 @@ const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const SUPABASE_BUCKET = 'legalcase-documents';
 
+function generateUniqueFilename(originalName: string, taskType: string, docNumber: string): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const date = `${year}-${month}-${day}`;
+    
+    // Generate a random 6-character string
+    const uniqueCode = Math.random().toString(36).substring(2, 8);
+    
+    const extension = path.extname(originalName);
+    const sanitizedTaskType = String(taskType || 'task').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const sanitizedDocNumber = String(docNumber || 'doc').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const newName = `${sanitizedTaskType}-${sanitizedDocNumber}-${date}-${uniqueCode}${extension}`;
+    
+    return `${year}/${newName}`;
+}
+
 // Upload a file buffer to Supabase Storage and return the public URL
-async function uploadFileToSupabase(fileBuffer: Buffer, fileName: string, mimeType: string): Promise<string | null> {
+async function uploadFileToSupabase(fileBuffer: Buffer, filePath: string, mimeType: string): Promise<string | null> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     console.error('Supabase upload: SUPABASE_URL or SUPABASE_SERVICE_KEY not set');
     return null;
   }
   try {
-    // Use unique filename to avoid collisions
-    const uniqueName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    console.log(`Supabase upload: uploading "${uniqueName}" to bucket "${SUPABASE_BUCKET}"`);
+    console.log(`Supabase upload: uploading "${filePath}" to bucket "${SUPABASE_BUCKET}"`);
 
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${uniqueName}`;
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${filePath}`;
     const resp = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
@@ -51,7 +68,7 @@ async function uploadFileToSupabase(fileBuffer: Buffer, fileName: string, mimeTy
       return null;
     }
 
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${uniqueName}`;
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filePath}`;
     console.log('Supabase upload success:', publicUrl);
     return publicUrl;
   } catch (err: any) {
@@ -447,10 +464,12 @@ async function startServer() {
         isFinish: false,
       };
 
-      // Upload court document to Google Drive if provided
+      // Upload court document to Supabase if provided
       if (req.file) {
-        const driveLink = await uploadFileToSupabase(req.file.buffer, req.file.originalname, req.file.mimetype);
-        if (driveLink) newCase.courtDocument = driveLink;
+        const { taskType, docNumber } = newCase;
+        const filePath = generateUniqueFilename(req.file.originalname, taskType, docNumber);
+        const supabaseLink = await uploadFileToSupabase(req.file.buffer, filePath, req.file.mimetype);
+        if (supabaseLink) newCase.courtDocument = supabaseLink;
       }
 
       // Parse fn_additionalFees JSON string back to array
@@ -543,10 +562,20 @@ async function startServer() {
     try {
       const updateData: any = { ...req.body };
 
-      // Upload court document to Google Drive if a new file is provided
+      // Update in sheet
+      const cases = await readSheetAsObjects('case');
+      const existing = cases.find(c => String(c.id) === String(req.params.id));
+      if (!existing) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+
+      // Upload court document to Supabase if a new file is provided
       if (req.file) {
-        const driveLink = await uploadFileToSupabase(req.file.buffer, req.file.originalname, req.file.mimetype);
-        if (driveLink) updateData.courtDocument = driveLink;
+        const taskType = updateData.taskType || existing.taskType;
+        const docNumber = updateData.docNumber || existing.docNumber;
+        const filePath = generateUniqueFilename(req.file.originalname, taskType, docNumber);
+        const supabaseLink = await uploadFileToSupabase(req.file.buffer, filePath, req.file.mimetype);
+        if (supabaseLink) updateData.courtDocument = supabaseLink;
       }
 
       // Parse fn_additionalFees JSON string back to array
@@ -575,12 +604,6 @@ async function startServer() {
       if (updateData.fn_customer) updateData.fn_customerName = (customerOptions.find((o:any) => o.id === updateData.fn_customer) || {}).label || updateData.fn_customerName || '';
       if (updateData.fn_customer) updateData.fn_customerName = (customerOptions.find((o:any) => o.id === updateData.fn_customer) || {}).label || updateData.fn_customerName || '';
 
-      // Update in sheet
-      const cases = await readSheetAsObjects('case');
-      const existing = cases.find(c => String(c.id) === String(req.params.id));
-      if (!existing) {
-        return res.status(404).json({ error: 'Case not found' });
-      }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
       const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
