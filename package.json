@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch server.ts",
-    "build": "vite build && tsc --project tsconfig.server.json",
-    "start": "node build/server.js",
-    "preview": "vite preview",
-    "clean": "rm -rf dist build",
-    "lint": "tsc --noEmit"
+  "dev": "tsx server.ts",
+      "build": "vite build",
+      "start": "node server.js",
+      "preview": "vite preview",
+      "clean": "rm -rf dist",
+      "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
