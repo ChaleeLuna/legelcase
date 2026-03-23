@@ -286,33 +286,41 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium text-slate-700 ml-1">เอกสารจากศาล (อัปโหลดขึ้น Supabase Storage)</label>
-            {formData.courtDocument && (
-              <div className="mb-3">
+            {formData.courtDocument && !file ? (
+              <div className="flex flex-col items-center gap-3 py-6 bg-white/40 border-2 border-slate-200 rounded-2xl">
                 <a
                   href={formData.courtDocument}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 transition-all"
                 >
                   <FileText className="w-5 h-5" /> เปิดดูเอกสารที่อัปโหลดแล้ว
                 </a>
-                <p className="text-xs text-slate-500 mt-2">อัปโหลดไฟล์ใหม่ด้านล่างเพื่อแทนที่เอกสารเดิม</p>
+                <button
+                  type="button"
+                  onClick={() => { const el = document.getElementById('file-upload'); el?.click(); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <Upload className="w-4 h-4" /> อัปโหลดไฟล์ใหม่แทนที่
+                </button>
+                <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              </div>
+            ) : (
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 border-dashed rounded-2xl bg-white/30 hover:bg-white/50 transition-colors relative">
+                <div className="space-y-1 text-center">
+                  <Upload className="mx-auto h-12 w-12 text-slate-400" />
+                  <div className="flex text-sm text-slate-600 justify-center">
+                    <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                      <span>อัปโหลดไฟล์</span>
+                      <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                    </label>
+                    <p className="pl-1">หรือลากวางที่นี่</p>
+                  </div>
+                  <p className="text-xs text-slate-500">PDF, PNG, JPG ไม่เกิน 10MB</p>
+                  {file && <p className="text-sm font-medium text-emerald-600 mt-2 bg-emerald-50 py-1 px-3 rounded-full inline-block">{file.name}</p>}
+                </div>
               </div>
             )}
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 border-dashed rounded-2xl bg-white/30 hover:bg-white/50 transition-colors relative">
-              <div className="space-y-1 text-center">
-                <Upload className="mx-auto h-12 w-12 text-slate-400" />
-                <div className="flex text-sm text-slate-600 justify-center">
-                  <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
-                    <span>อัปโหลดไฟล์</span>
-                    <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                  </label>
-                  <p className="pl-1">หรือลากวางที่นี่</p>
-                </div>
-                <p className="text-xs text-slate-500">PDF, PNG, JPG ไม่เกิน 10MB</p>
-                {file && <p className="text-sm font-medium text-emerald-600 mt-2 bg-emerald-50 py-1 px-3 rounded-full inline-block">{file.name}</p>}
-              </div>
-            </div>
           </div>
 
           <div className="space-y-2 md:col-span-2">
@@ -858,7 +866,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pie - ประเภทคดี */}
         <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
           <h4 className="text-sm font-semibold text-slate-700 mb-4">สัดส่วนประเภทคดี</h4>
@@ -877,35 +885,6 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
               <div key={d.name} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TYPE_COLORS[i] }} />
-                  <span className="text-slate-600">{d.name}</span>
-                </div>
-                <span className="font-semibold text-slate-800">{d.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bar - สถานะงาน */}
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6">
-          <h4 className="text-sm font-semibold text-slate-700 mb-4">สถานะงาน</h4>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statusChartData} barSize={32}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip formatter={(v: any) => [`${v} คดี`]} />
-                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                  {statusChartData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-2 mt-2">
-            {statusChartData.map(d => (
-              <div key={d.name} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
                   <span className="text-slate-600">{d.name}</span>
                 </div>
                 <span className="font-semibold text-slate-800">{d.value}</span>
@@ -1833,7 +1812,6 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
         });
         setFile(null);
         onSuccess();
-        setTimeout(() => setSubmitStatus('idle'), 3000);
       } else {
         setSubmitStatus('error');
       }
@@ -1880,22 +1858,55 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
             )}
           </button>
         </div>
-
-        <AnimatePresence>
-          {submitStatus === 'success' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-700">
-              <CheckCircle2 className="w-5 h-5" />
-              <p className="font-medium">บันทึกข้อมูลสำเร็จเรียบร้อยแล้ว</p>
-            </motion.div>
-          )}
-          {submitStatus === 'error' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-700">
-              <AlertCircle className="w-5 h-5" />
-              <p className="font-medium">เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </form>
+
+      {/* Success Modal */}
+      <AnimatePresence>
+        {submitStatus === 'success' && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border border-white/40"
+            >
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">บันทึกสำเร็จ</h3>
+              <p className="text-slate-500 text-sm mb-6">บันทึกข้อมูลคดีเรียบร้อยแล้ว</p>
+              <button
+                onClick={() => setSubmitStatus('idle')}
+                className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-500/30"
+              >
+                ตกลง
+              </button>
+            </motion.div>
+          </div>
+        )}
+        {submitStatus === 'error' && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border border-white/40"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">เกิดข้อผิดพลาด</h3>
+              <p className="text-slate-500 text-sm mb-6">ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>
+              <button
+                onClick={() => setSubmitStatus('idle')}
+                className="w-full px-6 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl font-medium hover:from-red-600 hover:to-rose-600 transition-all shadow-lg shadow-red-500/30"
+              >
+                ปิด
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -1904,6 +1915,7 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
 function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authStatus, setAuthStatus] = useState<'loading' | 'pending' | 'approved' | 'error'>('loading');
+  const [authError, setAuthError] = useState<string>('');
   const [currentView, setCurrentView] = useState<'stats' | 'list' | 'kanban' | 'create' | 'archived'>('stats');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1913,19 +1925,39 @@ function App() {
   });
 
   useEffect(() => {
-    const liffId = import.meta.env.VITE_LIFF_ID || (window as any).__LIFF_ID__;
-    const envLiffId = import.meta.env.NEXT_PUBLIC_LIFF_ID
-    initLiff(liffId || envLiffId);
+    const liffId = (import.meta as any).env?.VITE_LIFF_ID || (window as any).__LIFF_ID__ || '2009414446-4CvOZQML';
+    initLiff(liffId);
   }, []);
 
   const initLiff = async (liffId: string) => {
     try {
+      console.log('Initializing LIFF with ID:', liffId);
+      
+      // Dev bypass: ถ้า VITE_DEV_MODE=1 และมี ?bypass=1 ใน URL ให้ข้ามการ login
+      const urlParams = new URLSearchParams(window.location.search);
+      const isDevMode = (import.meta as any).env?.VITE_DEV_MODE === '1';
+      if (isDevMode && urlParams.get('bypass') === '1') {
+        console.log('DEV BYPASS MODE - skipping LIFF auth');
+        const mockUser: AuthUser = { userId: 'dev_user', displayName: 'Dev User', pictureUrl: '', permission: 1 };
+        setAuthUser(mockUser);
+        setAuthStatus('approved');
+        return;
+      }
+      
       await liff.init({ liffId });
+      console.log('LIFF initialized, isLoggedIn:', liff.isLoggedIn());
+      
       if (!liff.isLoggedIn()) {
+        console.log('Not logged in, redirecting to LINE login...');
         liff.login();
         return;
       }
+      
+      console.log('Getting profile...');
       const profile = await liff.getProfile();
+      console.log('Profile received:', profile);
+      
+      console.log('Sending auth request to backend...');
       const res = await fetch('/api/auth/line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1936,7 +1968,15 @@ function App() {
           statusMessage: profile.statusMessage || '',
         }),
       });
+      
+      if (!res.ok) {
+        console.error('Backend auth failed:', res.status, await res.text());
+        throw new Error('Backend auth failed');
+      }
+      
       const data = await res.json();
+      console.log('Backend auth response:', data);
+      
       const user: AuthUser = {
         userId: profile.userId,
         displayName: profile.displayName,
@@ -1945,8 +1985,15 @@ function App() {
       };
       setAuthUser(user);
       setAuthStatus(data.permission === 1 ? 'approved' : 'pending');
-    } catch (err) {
+      console.log('Auth status set to:', data.permission === 1 ? 'approved' : 'pending');
+    } catch (err: any) {
       console.error('LIFF init error:', err);
+      console.error('Error details:', {
+        message: err?.message,
+        stack: err?.stack,
+        name: err?.name
+      });
+      setAuthError(err?.message || String(err));
       setAuthStatus('error');
     }
   };
@@ -2018,7 +2065,12 @@ function App() {
         <div className="bg-white/80 rounded-3xl p-8 text-center max-w-sm shadow-xl">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-800 mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-slate-500 text-sm mb-6">ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาเปิดผ่าน LINE แอพ</p>
+          <p className="text-slate-500 text-sm mb-3">ไม่สามารถเชื่อมต่อกับ LINE ได้ กรุณาเปิดผ่าน LINE แอพ</p>
+          {authError && (
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4 text-left">
+              <p className="text-xs text-red-600 font-mono break-all">{authError}</p>
+            </div>
+          )}
           <button onClick={() => window.location.reload()} className="px-6 py-3 bg-indigo-500 text-white rounded-2xl font-medium hover:bg-indigo-600 transition-colors">
             ลองใหม่
           </button>
@@ -2061,10 +2113,10 @@ function App() {
 
   return (
     <AuthContext.Provider value={authUser}>
-    <div className="min-h-screen bg-[#F2F2F7] flex font-sans selection:bg-blue-200">
+    <div className="min-h-screen bg-[#F2F2F7] flex font-sans selection:bg-blue-200" style={{ fontFamily: "'Sarabun', sans-serif" }}>
       {/* Sidebar (Desktop) */}
       <aside 
-        className={`hidden md:flex flex-col bg-white/80 backdrop-blur-3xl border-r border-white/40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex flex-col bg-white/80 backdrop-blur-3xl border-r border-white/40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 ease-in-out fixed top-0 left-0 h-screen ${
           isSidebarCollapsed ? 'w-24' : 'w-72'
         }`}
       >
@@ -2100,37 +2152,46 @@ function App() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-200/50 flex flex-col gap-2">
-          {/* User profile */}
-          {!isSidebarCollapsed && authUser && (
-            <div className="flex items-center gap-3 px-2 py-2">
+        <div className="p-4 border-t border-slate-200/50">
+          {/* User profile + collapse + logout */}
+          {!isSidebarCollapsed && authUser ? (
+            <div className="flex items-center gap-2 px-2 py-2">
               {authUser.pictureUrl
                 ? <img src={authUser.pictureUrl} alt="profile" className="w-8 h-8 rounded-full shrink-0" />
                 : <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><User className="w-4 h-4 text-indigo-500" /></div>
               }
-              <div className="min-w-0">
+              <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-slate-700 truncate">{authUser.displayName}</p>
                 <div className="flex items-center gap-1 mt-0.5">
                   <ShieldCheck className="w-3 h-3 text-emerald-500" />
                   <p className="text-xs text-emerald-600">อนุมัติแล้ว</p>
                 </div>
               </div>
+              <button
+                onClick={() => { try { liff.logout(); } catch {} window.location.reload(); }}
+                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0"
+                title="ออกจากระบบ"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
-          )}
-          <div className="flex justify-center gap-2">
+          ) : null}
+          <div className="flex justify-center mt-2">
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
             >
               {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
             </button>
-            <button
-              onClick={() => { try { liff.logout(); } catch {} window.location.reload(); }}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-              title="ออกจากระบบ"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
+            {isSidebarCollapsed && (
+              <button
+                onClick={() => { try { liff.logout(); } catch {} window.location.reload(); }}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                title="ออกจากระบบ"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
       </aside>
@@ -2175,7 +2236,7 @@ function App() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pt-16 md:pt-0 relative">
+      <main className={`flex-1 overflow-y-auto pt-16 md:pt-0 relative transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-24' : 'md:ml-72'}`}>
         {/* Background decorative elements */}
         <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-100/40 via-purple-100/40 to-emerald-100/40 pointer-events-none" />
         <div className="absolute top-20 right-20 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
