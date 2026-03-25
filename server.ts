@@ -3,9 +3,11 @@ import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import cors from "cors";
 import path from "path";
+import fs from "fs/promises";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { google } from "googleapis";
+import * as docxTemplates from "docx-templates";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +24,19 @@ const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const SUPABASE_BUCKET = 'legalcase-documents';
+const WORD_TEMPLATE_DIR = path.join(process.cwd(), "templates", "word");
+const LEGACY_WORD_TEMPLATE_DIR = path.join(process.cwd(), "templates");
+const CASE_DEFAULT_HEADERS = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
+const THAI_MONTHS_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const createDocxReport =
+  typeof docxTemplates.createReport === "function"
+    ? docxTemplates.createReport
+    : typeof docxTemplates.default === "function"
+      ? docxTemplates.default
+      : typeof docxTemplates === "function"
+        ? docxTemplates
+        : null;
 
 function generateUniqueFilename(originalName: string, taskType: string, docNumber: string): string {
     const now = new Date();
@@ -40,6 +55,132 @@ function generateUniqueFilename(originalName: string, taskType: string, docNumbe
     const newName = `${sanitizedTaskType}-${sanitizedDocNumber}-${date}-${uniqueCode}${extension}`;
     
     return `${year}/${newName}`;
+}
+
+function parseSupportedDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const dateOnlyMatch = trimmed.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const isoMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
+  if (isoMatch) {
+    const [year, month, day] = isoMatch[1].split("-").map(Number);
+    const parsed = new Date(year, month - 1, day);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+}
+
+function formatThaiBuddhistDateParts(date: Date) {
+  const day = date.getDate();
+  const monthIndex = date.getMonth();
+  const year = date.getFullYear() + 543;
+
+  return {
+    thdate_full: `${day} ${THAI_MONTHS_FULL[monthIndex]} ${year}`,
+    thdate_short: `${day} ${THAI_MONTHS_SHORT[monthIndex]} ${year}`,
+    thmonth_full: `${THAI_MONTHS_FULL[monthIndex]} ${year}`,
+    thmonth_short: `${THAI_MONTHS_SHORT[monthIndex]} ${year}`,
+  };
+}
+
+function normalizeTemplateValue(value: any): any {
+  if (value == null) return "";
+  if (Array.isArray(value)) return value.map(normalizeTemplateValue);
+  if (typeof value === "object") {
+    const normalized: Record<string, any> = {};
+    Object.entries(value).forEach(([key, innerValue]) => {
+      normalized[key] = normalizeTemplateValue(innerValue);
+    });
+    return normalized;
+  }
+  return value;
+}
+
+function buildFineFeeItems(source: Record<string, any>) {
+  const additionalFees = Array.isArray(source.fn_additionalFees) ? source.fn_additionalFees : [];
+  const feeItems = additionalFees.map((fee: any, index: number) => ({
+    index: index + 1,
+    name: String(fee?.name ?? "").trim(),
+    amount: String(fee?.amount ?? "").trim(),
+  }));
+
+  const fineAmount = String(source.fn_amount ?? "").trim();
+  if (fineAmount) {
+    feeItems.push({
+      index: feeItems.length + 1,
+      name: "ค่าละเมิด",
+      amount: fineAmount,
+    });
+  }
+
+  return feeItems;
+}
+
+function withThaiDateVariants(source: Record<string, any>) {
+  const result: Record<string, any> = {};
+
+  Object.entries(source).forEach(([key, value]) => {
+    result[key] = normalizeTemplateValue(value);
+
+    const parsedDate = parseSupportedDate(value);
+    if (parsedDate) {
+      const formatted = formatThaiBuddhistDateParts(parsedDate);
+      result[`${key}_thdate_full`] = formatted.thdate_full;
+      result[`${key}_thdate_short`] = formatted.thdate_short;
+      result[`${key}_thmonth_full`] = formatted.thmonth_full;
+      result[`${key}_thmonth_short`] = formatted.thmonth_short;
+    }
+  });
+
+  const fineFeeItems = buildFineFeeItems(source);
+  result.fn_feeItems = fineFeeItems;
+  result.fn_feeItemsText = fineFeeItems
+    .map((item) => `${item.index}. ${item.name} จำนวนเงิน ${item.amount} บาท`)
+    .join("\n");
+  result.fn_feeItemsBlock = result.fn_feeItemsText;
+  result.fn_feeItemsParagraphs = fineFeeItems.map((item) => ({
+    text: `${item.index}. ${item.name} จำนวนเงิน ${item.amount} บาท`,
+  }));
+
+  return result;
+}
+
+async function resolveWordTemplatePath(taskType: string) {
+  const filename = `${String(taskType || "task").trim()}.docx`;
+  const candidates = [
+    path.join(WORD_TEMPLATE_DIR, filename),
+    path.join(LEGACY_WORD_TEMPLATE_DIR, filename),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // Try the next candidate path.
+    }
+  }
+
+  return null;
+}
+
+function buildWordDownloadName(caseData: Record<string, any>) {
+  const safeTaskType = String(caseData.taskType || "task").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const safeDocNumber = String(caseData.docNumber || caseData.id || "case").replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `${safeTaskType}-${safeDocNumber}.docx`;
 }
 
 // Upload a file buffer to Supabase Storage and return the public URL
@@ -421,7 +562,6 @@ async function startServer() {
   app.get("/api/cases", async (req, res) => {
     try {
       const cases = await readSheetAsObjects("case");
-      console.log(cases)
       const activeCases = cases.filter(c => !c.isArchived);
       res.json(activeCases);
     } catch (err) {
@@ -439,6 +579,50 @@ async function startServer() {
     } catch (err) {
       console.error("Failed to load archived cases from sheet:", err);
       res.status(500).json({ error: "Failed to load archived cases" });
+    }
+  });
+
+  app.get("/api/cases/:id/word", async (req, res) => {
+    try {
+      const cases = await readSheetAsObjects("case");
+      const caseData = cases.find(c => String(c.id) === String(req.params.id));
+
+      if (!caseData) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+
+      const templatePath = await resolveWordTemplatePath(caseData.taskType);
+      if (!templatePath) {
+        return res.status(404).json({
+          error: `Template not found for task type "${caseData.taskType}"`,
+        });
+      }
+
+      const template = await fs.readFile(templatePath);
+      const templateData = withThaiDateVariants(caseData);
+      const templateExtras = {
+        fn_feeItemsBlock: templateData.fn_feeItemsBlock,
+        fn_feeItemsText: templateData.fn_feeItemsText,
+        fn_feeItemsParagraphs: templateData.fn_feeItemsParagraphs,
+      };
+      if (typeof createDocxReport !== "function") {
+        throw new Error("docx-templates createReport is unavailable");
+      }
+      const report = await createDocxReport({
+        template,
+        data: templateData,
+        additionalJsContext: templateExtras,
+        cmdDelimiter: ["{{", "}}"],
+        processLineBreaks: true,
+        processLineBreaksAsNewText: true,
+      });
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="${buildWordDownloadName(caseData)}"`);
+      return res.send(Buffer.from(report));
+    } catch (err) {
+      console.error("Failed to generate word document:", err);
+      return res.status(500).json({ error: "Failed to generate word document" });
     }
   });
 
@@ -510,8 +694,7 @@ async function startServer() {
       // Append to sheet
       const sheets = await getSheetsClient();
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
-      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       console.log('Using headers for append:', effectiveHeaders);
       
       // Convert fn_additionalFees array to JSON string for sheet storage
@@ -606,8 +789,7 @@ async function startServer() {
 
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
-      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       const updated = { ...existing, ...updateData };
       
       // Convert fn_additionalFees array to JSON string for sheet storage
@@ -653,8 +835,7 @@ async function startServer() {
       const updated = { ...existing, taskState, taskStateName } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
-      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       
       // Convert fn_additionalFees array to JSON string if present
       if (Array.isArray(updated.fn_additionalFees)) {
@@ -701,8 +882,7 @@ async function startServer() {
       }
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
-      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       
       // Convert fn_additionalFees array to JSON string if present
       if (Array.isArray(updated.fn_additionalFees)) {
@@ -745,8 +925,7 @@ async function startServer() {
       const updated = { ...existing, isArchived: false, isFinish: false } as any;
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
-      const defaultHeaders = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
-      const effectiveHeaders = headers.length > 0 ? headers : defaultHeaders;
+      const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
       if (Array.isArray(updated.fn_additionalFees)) {
         updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);

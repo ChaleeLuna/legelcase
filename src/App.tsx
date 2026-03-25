@@ -6,7 +6,7 @@ import {
   FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown, 
   LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2, 
   Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus,
-  User, Hash, ClipboardList, FileCheck, FolderArchive, XCircle, LogOut, ShieldCheck, Clock
+  User, Hash, ClipboardList, FileCheck, FolderArchive, XCircle, LogOut, ShieldCheck, Clock, Download
 } from 'lucide-react';
 
 declare const liff: any;
@@ -15,6 +15,27 @@ declare const liff: any;
 type AuthUser = { userId: string; displayName: string; pictureUrl: string; permission: number };
 const AuthContext = createContext<AuthUser | null>(null);
 const useAuth = () => useContext(AuthContext);
+
+const downloadCaseWord = async (caseId: string) => {
+  const response = await fetch(`/api/cases/${caseId}/word`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'ไม่สามารถดาวน์โหลดเอกสาร Word ได้');
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('Content-Disposition') || '';
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+  const filename = match?.[1] || `case-${caseId}.docx`;
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+};
 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, children, isConfirming, variant = 'danger' }: any) => {
   if (!isOpen) return null;
@@ -181,45 +202,45 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
           
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ประเภทงาน <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'car_crash' })}
-                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${
                   formData.taskType === 'car_crash' 
                     ? 'border-blue-500 bg-blue-50/50 text-blue-700' 
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                 } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <Car className="w-6 h-6 mb-2" />
-                <span className="text-sm font-medium">รถยนต์ชนเสา</span>
+                <Car className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-center leading-tight">รถยนต์ชนเสา</span>
               </button>
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'overdue_payment' })}
-                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${
                   formData.taskType === 'overdue_payment' 
                     ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700' 
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                 } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <CreditCard className="w-6 h-6 mb-2" />
-                <span className="text-sm font-medium">ค่าไฟฟ้าค้างชำระ</span>
+                <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าไฟฟ้าค้างชำระ</span>
               </button>
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'fine', fn_additionalFees: [] })}
-                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${
                   formData.taskType === 'fine' 
                     ? 'border-amber-500 bg-amber-50/50 text-amber-700' 
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                 } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <Gavel className="w-6 h-6 mb-2" />
-                <span className="text-sm font-medium">ค่าไฟฟ้าปรับปรุง</span>
+                <Gavel className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าไฟฟ้าปรับปรุง</span>
               </button>
             </div>
             {isEditMode && <p className="text-xs text-amber-600 ml-1 mt-1">ไม่สามารถแก้ไขประเภทงานได้</p>}
@@ -577,6 +598,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   const [isFinishOnArchive, setIsFinishOnArchive] = useState(false);
+  const [isDownloadingWord, setIsDownloadingWord] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -666,24 +688,44 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     }
   };
 
+  const handleDownloadWord = async () => {
+    setIsDownloadingWord(true);
+    try {
+      await downloadCaseWord(caseData.id);
+    } catch (error) {
+      console.error('Error downloading Word file:', error);
+      alert('ไม่สามารถดาวน์โหลดไฟล์ Word ได้');
+    } finally {
+      setIsDownloadingWord(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40"
+        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40 mx-2 sm:mx-0"
       >
-        <div className="flex items-center justify-between p-6 bg-white/50 border-b border-slate-200/50">
-          <h2 className="text-2xl font-semibold text-slate-800 flex items-center gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 bg-white/50 border-b border-slate-200/50">
+          <h2 className="text-lg sm:text-2xl font-semibold text-slate-800 flex items-center gap-2 min-w-0">
             <Edit2 className="w-6 h-6 text-indigo-500" />
-            แก้ไขข้อมูลคดี {caseData.docNumber}
+            <span className="min-w-0 break-words">แก้ไขข้อมูลคดี {caseData.docNumber}</span>
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadWord}
+              disabled={isDownloadingWord}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+            >
+              <Download className="w-4 h-4" /> {isDownloadingWord ? "กำลังสร้าง..." : "ดาวน์โหลด Word"}
+            </button>
             <button 
               onClick={handleArchive} 
               disabled={isArchiving}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl transition-colors text-sm font-medium whitespace-nowrap"
             >
               <Archive className="w-4 h-4" /> {isArchiving ? "กำลังจัดเก็บ..." : "จัดเก็บ"}
             </button>
@@ -693,7 +735,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <form id="edit-form" onSubmit={handleSubmit}>
             <CaseFormFields 
               formData={formData} 
@@ -706,20 +748,20 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
           </form>
         </div>
 
-        <div className="p-6 bg-white/50 border-t border-slate-200/50 flex justify-between items-center">
-          <div>
+        <div className="p-4 sm:p-6 bg-white/50 border-t border-slate-200/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center">
+          <div className="w-full sm:w-auto">
             <button
               onClick={() => setIsConfirmOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors text-sm font-medium"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors text-sm font-medium w-full sm:w-auto"
             >
               <Trash2 className="w-4 h-4" /> ลบ
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={onClose} className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <button type="button" onClick={onClose} className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors w-full sm:w-auto">
               ยกเลิก
             </button>
-            <button type="submit" form="edit-form" disabled={isSubmitting} className="px-6 py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-70">
+            <button type="submit" form="edit-form" disabled={isSubmitting} className="px-6 py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-70 w-full sm:w-auto">
               {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
             </button>
           </div>
@@ -816,14 +858,14 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
   const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   const StatCard = ({ icon, label, value, sub, color }: any) => (
-    <div className={`bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-6 flex items-center gap-4`}>
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
+    <div className={`bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4`}>
+      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
         {icon}
       </div>
-      <div>
-        <p className="text-sm text-slate-500 font-medium">{label}</p>
-        <p className="text-3xl font-bold text-slate-800 leading-tight">{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      <div className="min-w-0">
+        <p className="text-xs sm:text-sm text-slate-500 font-medium leading-tight">{label}</p>
+        <p className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">{value}</p>
+        {sub && <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 leading-tight">{sub}</p>}
       </div>
     </div>
   );
@@ -843,10 +885,10 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
           <h3 className="text-base font-semibold text-slate-700">ภาพรวมสำหรับผู้บริหาร</h3>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={<LayoutDashboard className="w-7 h-7 text-indigo-600" />} label="คดีที่กำลังดำเนินการ" value={activeCases.length} sub={`จัดเก็บแล้ว ${archivedCases.length} คดี`} color="bg-indigo-50" />
-          <StatCard icon={<Car className="w-7 h-7 text-blue-600" />} label="รถยนต์ชนเสา" value={carCrash.length} sub={`${fmt(totalCarDamage)} บาท`} color="bg-blue-50" />
-          <StatCard icon={<CreditCard className="w-7 h-7 text-emerald-600" />} label="ค่าไฟฟ้าค้างชำระ" value={overdue.length} sub={`${fmt(totalOverdue)} บาท`} color="bg-emerald-50" />
-          <StatCard icon={<Gavel className="w-7 h-7 text-amber-600" />} label="ค่าไฟฟ้าปรับปรุง" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
+          <StatCard icon={<LayoutDashboard className="w-5 h-5 sm:w-7 sm:h-7 text-indigo-600" />} label="คดีที่กำลังดำเนินการ" value={activeCases.length} sub={`จัดเก็บแล้ว ${archivedCases.length} คดี`} color="bg-indigo-50" />
+          <StatCard icon={<Car className="w-5 h-5 sm:w-7 sm:h-7 text-blue-600" />} label="รถยนต์ชนเสา" value={carCrash.length} sub={`${fmt(totalCarDamage)} บาท`} color="bg-blue-50" />
+          <StatCard icon={<CreditCard className="w-5 h-5 sm:w-7 sm:h-7 text-emerald-600" />} label="ค่าไฟฟ้าค้างชำระ" value={overdue.length} sub={`${fmt(totalOverdue)} บาท`} color="bg-emerald-50" />
+          <StatCard icon={<Gavel className="w-5 h-5 sm:w-7 sm:h-7 text-amber-600" />} label="ค่าไฟฟ้าปรับปรุง" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
         </div>
 
         {/* มูลค่ารวม */}
@@ -1128,6 +1170,7 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
 // Case Detail Modal (Read-only)
 const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; onClose: () => void; onUnarchive?: () => void }) => {
   const [isUnarchiving, setIsUnarchiving] = useState(false);
+  const [isDownloadingWord, setIsDownloadingWord] = useState(false);
 
   const handleUnarchive = async () => {
     setIsUnarchiving(true);
@@ -1147,8 +1190,8 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
   };
   const Field = ({ label, value }: { label: string; value?: string }) => (
     <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-slate-800 font-medium bg-white/60 px-3 py-2 rounded-xl border border-slate-100">{value || '-'}</p>
+      <p className="text-[11px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className="text-sm sm:text-base text-slate-800 font-medium bg-white/60 px-3 py-2 rounded-xl border border-slate-100 break-words leading-relaxed">{value || '-'}</p>
     </div>
   );
 
@@ -1157,40 +1200,61 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
     try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
   };
 
+  const handleDownloadWord = async () => {
+    setIsDownloadingWord(true);
+    try {
+      await downloadCaseWord(caseData.id);
+    } catch (error) {
+      console.error('Error downloading Word file:', error);
+      alert('ไม่สามารถดาวน์โหลดไฟล์ Word ได้');
+    } finally {
+      setIsDownloadingWord(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40"
+        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40 mx-2 sm:mx-0 mt-4 sm:mt-0"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 bg-white/50 border-b border-slate-200/50">
-          <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-5 sm:p-6 bg-white/50 border-b border-slate-200/50">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-800 flex items-center gap-2 min-w-0">
             <FolderArchive className="w-5 h-5 text-indigo-500" />
-            รายละเอียดคดี {caseData.docNumber}
+            <span className="min-w-0 break-words">รายละเอียดคดี {caseData.docNumber}</span>
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-stretch gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleDownloadWord}
+              disabled={isDownloadingWord}
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-colors disabled:opacity-50 whitespace-nowrap flex-1 sm:flex-none"
+            >
+              <Download className="w-4 h-4" />
+              {isDownloadingWord ? 'กำลังสร้าง...' : 'ดาวน์โหลด Word'}
+            </button>
             {caseData.isFinish ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+              <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 max-w-full whitespace-normal break-words leading-tight flex-1 sm:flex-none">
                 <CheckCircle2 className="w-3.5 h-3.5" /> เสร็จสิ้นแล้ว
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+              <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 max-w-full whitespace-normal break-words leading-tight flex-1 sm:flex-none">
                 <XCircle className="w-3.5 h-3.5" /> ยังไม่เสร็จ
               </span>
             )}
-            <button onClick={onClose} className="p-2 hover:bg-slate-200/50 rounded-full transition-colors">
+            <button onClick={onClose} className="p-2 hover:bg-slate-200/50 rounded-full transition-colors self-start sm:self-auto">
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {/* General Info */}
-          <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+          <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
               <FileText className="w-4 h-4 text-indigo-400" /> ข้อมูลทั่วไป
             </h3>
@@ -1206,12 +1270,12 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               {caseData.notes && <div className="sm:col-span-2"><Field label="หมายเหตุ" value={caseData.notes} /></div>}
               {caseData.courtDocument && (
                 <div className="sm:col-span-2 space-y-1">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">เอกสารจากศาล</p>
+                  <p className="text-[11px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">เอกสารจากศาล</p>
                   <a
                     href={caseData.courtDocument}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-xl border border-indigo-100 transition-colors font-medium"
+                    className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-xl border border-indigo-100 transition-colors font-medium max-w-full break-words"
                   >
                     <FileText className="w-4 h-4" /> เปิดเอกสาร (Google Drive)
                   </a>
@@ -1222,7 +1286,7 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
 
           {/* Type-specific Info */}
           {caseData.taskType === 'car_crash' && (
-            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <Car className="w-4 h-4 text-blue-400" /> ข้อมูลคดีรถยนต์ชนเสา
               </h3>
@@ -1236,7 +1300,7 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
           )}
 
           {caseData.taskType === 'overdue_payment' && (
-            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-emerald-400" /> ข้อมูลคดีค่าไฟฟ้าค้างชำระ
               </h3>
@@ -1251,7 +1315,7 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
           )}
 
           {caseData.taskType === 'fine' && (
-            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-sm">
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <Gavel className="w-4 h-4 text-amber-400" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
               </h3>
@@ -1267,9 +1331,9 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">ค่าอื่นๆ</p>
                     <div className="space-y-1">
                       {parseFees(caseData.fn_additionalFees).map((fee: any, i: number) => (
-                        <div key={i} className="flex justify-between text-sm bg-white/60 px-3 py-2 rounded-xl border border-slate-100">
-                          <span className="text-slate-700">{fee.name}</span>
-                          <span className="font-medium text-slate-800">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</span>
+                        <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm bg-white/60 px-3 py-2 rounded-xl border border-slate-100">
+                          <span className="text-slate-700 break-words">{fee.name}</span>
+                          <span className="font-medium text-slate-800 whitespace-nowrap">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</span>
                         </div>
                       ))}
                     </div>
@@ -1287,18 +1351,18 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
         </div>
 
         {/* Footer */}
-        <div className="p-5 bg-white/50 border-t border-slate-200/50 flex justify-between items-center">
+        <div className="p-4 sm:p-5 bg-white/50 border-t border-slate-200/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center">
           {onUnarchive && (
             <button
               onClick={handleUnarchive}
               disabled={isUnarchiving}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50 w-full sm:w-auto"
             >
               <Archive className="w-4 h-4" />
               {isUnarchiving ? 'กำลังดำเนินการ...' : 'ยกเลิกการจัดเก็บ'}
             </button>
           )}
-          <button onClick={onClose} className="px-6 py-2.5 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors">
+          <button onClick={onClose} className="px-6 py-2.5 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors w-full sm:w-auto">
             ปิด
           </button>
         </div>
@@ -1414,16 +1478,16 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
                       </td>
                       <td className="px-6 py-4">
                         {c.taskType === 'car_crash' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                            <Car className="w-3.5 h-3.5" /> รถชนเสา
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 max-w-full whitespace-normal break-words leading-tight">
+                            <Car className="w-4 h-4 shrink-0" /> <span className="min-w-0">รถชนเสา</span>
                           </span>
                         ) : c.taskType === 'fine' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                            <Gavel className="w-3.5 h-3.5" /> {details.type}
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100 max-w-full whitespace-normal break-words leading-tight">
+                            <Gavel className="w-4 h-4 shrink-0" /> <span className="min-w-0">{details.type}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            <CreditCard className="w-3.5 h-3.5" /> ค่าไฟฟ้าค้างชำระ
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-full whitespace-normal break-words leading-tight">
+                            <CreditCard className="w-4 h-4 shrink-0" /> <span className="min-w-0">ค่าไฟฟ้าค้างชำระ</span>
                           </span>
                         )}
                       </td>
@@ -1439,8 +1503,8 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 mb-1">
-                          <ClipboardList className="w-4 h-4 text-slate-400" />
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border
+                          <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border max-w-full whitespace-normal break-words leading-tight
                             ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' :
                               c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                               'bg-slate-100 text-slate-700 border-slate-200'}`}
@@ -1449,8 +1513,8 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <FileCheck className="w-4 h-4 text-slate-400" />
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600">
+                          <FileCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 max-w-full whitespace-normal break-words leading-tight">
                             {c.docStateName || '-'}
                           </span>
                         </div>
@@ -1458,11 +1522,11 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
                       <td className="px-6 py-4 text-sm text-slate-600">{c.lawyerName || '-'}</td>
                       <td className="px-6 py-4">
                         {c.isFinish ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 max-w-full whitespace-normal break-words leading-tight">
                             <CheckCircle2 className="w-3.5 h-3.5" /> เสร็จสิ้นแล้ว
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 max-w-full whitespace-normal break-words leading-tight">
                             <XCircle className="w-3.5 h-3.5" /> ยังไม่เสร็จ
                           </span>
                         )}
@@ -1634,16 +1698,16 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                     </td>
                     <td className="px-6 py-4">
                       {c.taskType === 'car_crash' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                          <Car className="w-3.5 h-3.5" /> รถชนเสา
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 max-w-full whitespace-normal break-words leading-tight">
+                          <Car className="w-4 h-4 shrink-0" /> <span className="min-w-0">รถชนเสา</span>
                         </span>
                       ) : c.taskType === 'fine' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                          <Gavel className="w-3.5 h-3.5" /> {getCaseDetails(c).type}
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100 max-w-full whitespace-normal break-words leading-tight">
+                          <Gavel className="w-4 h-4 shrink-0" /> <span className="min-w-0">{getCaseDetails(c).type}</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          <CreditCard className="w-3.5 h-3.5" /> ค่าไฟฟ้าค้างชำระ
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-full whitespace-normal break-words leading-tight">
+                          <CreditCard className="w-4 h-4 shrink-0" /> <span className="min-w-0">ค่าไฟฟ้าค้างชำระ</span>
                         </span>
                       )}
                     </td>
@@ -1658,9 +1722,9 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <ClipboardList className="w-4 h-4 text-slate-400" />
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border
+                        <div className="flex items-center gap-2 mb-1">
+                          <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border max-w-full whitespace-normal break-words leading-tight
                           ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' : 
                             c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
                             'bg-slate-100 text-slate-700 border-slate-200'}`}
@@ -1669,8 +1733,8 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileCheck className="w-4 h-4 text-slate-400" />
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600">
+                        <FileCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 max-w-full whitespace-normal break-words leading-tight">
                           {c.docStateName}
                         </span>
                       </div>
@@ -1685,11 +1749,11 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200/50 bg-white/40">
-            <span className="text-sm text-slate-500 hidden sm:block">
-              แสดง {(currentPage - 1) * itemsPerPage + 1} ถึง {Math.min(currentPage * itemsPerPage, filteredCases.length)} จาก {filteredCases.length} รายการ
-            </span>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between px-4 sm:px-6 py-4 border-t border-slate-200/50 bg-white/40">
+          <span className="text-sm text-slate-500 hidden sm:block">
+            แสดง {(currentPage - 1) * itemsPerPage + 1} ถึง {Math.min(currentPage * itemsPerPage, filteredCases.length)} จาก {filteredCases.length} รายการ
+          </span>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
               <button 
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -1826,8 +1890,8 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 tracking-tight">สร้างรายการใหม่</h2>
-        <p className="text-slate-500 mt-2">กรอกข้อมูลรายละเอียดคดีเพื่อบันทึกลงในระบบ</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">สร้างรายการใหม่</h2>
+        <p className="text-sm sm:text-base text-slate-500 mt-2">กรอกข้อมูลรายละเอียดคดีเพื่อบันทึกลงในระบบ</p>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -1844,7 +1908,7 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-8 py-4 rounded-2xl font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-xl shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center gap-2"
+            className="w-full sm:w-auto px-8 py-4 rounded-2xl font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-xl shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
