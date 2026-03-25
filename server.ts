@@ -148,11 +148,11 @@ function withThaiDateVariants(source: Record<string, any>) {
   const fineFeeItems = buildFineFeeItems(source);
   result.fn_feeItems = fineFeeItems;
   result.fn_feeItemsText = fineFeeItems
-    .map((item) => `${item.index}. ${item.name} จำนวนเงิน ${item.amount} บาท`)
+    .map((item) => `${item.index}. ${item.name} รวมเป็นเงิน ${item.amount} บาท`)
     .join("\n");
   result.fn_feeItemsBlock = result.fn_feeItemsText;
   result.fn_feeItemsParagraphs = fineFeeItems.map((item) => ({
-    text: `${item.index}. ${item.name} จำนวนเงิน ${item.amount} บาท`,
+    text: `${item.index}. ${item.name} รวมเป็นเงิน ${item.amount} บาท`,
   }));
 
   return result;
