@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, createContext, useContext } from 'r
 import { motion, AnimatePresence } from 'motion/react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { 
-  FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown, 
-  LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2, 
+import {
+  FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown,
+  LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2,
   Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus,
   User, Hash, ClipboardList, FileCheck, FolderArchive, XCircle, LogOut, ShieldCheck, Clock, Download
 } from 'lucide-react';
@@ -26,7 +26,12 @@ const downloadCaseWord = async (caseId: string) => {
   const blob = await response.blob();
   const contentDisposition = response.headers.get('Content-Disposition') || '';
   const match = contentDisposition.match(/filename="?([^"]+)"?/i);
-  const filename = match?.[1] || `case-${caseId}.docx`;
+  let filename = match?.[1] || `case-${caseId}.docx`;
+  try {
+    filename = decodeURIComponent(filename);
+  } catch (e) {
+    // If it fails to decode, keep the original extracted string
+  }
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -35,6 +40,32 @@ const downloadCaseWord = async (caseId: string) => {
   anchor.click();
   anchor.remove();
   window.URL.revokeObjectURL(url);
+};
+
+export const parseCourtDocuments = (data: any) => {
+  if (!data) return [];
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    // fallback comma separated
+    return data.split(',').filter(Boolean).map((docUrl: string, idx: number) => {
+      let displayName = `เอกสารที่ ${idx + 1}`;
+      try {
+        const filename = decodeURIComponent(docUrl.split('/').pop() || '');
+        const match = filename.match(/^(.*?)-[a-z0-9]{12}(\.[^.]+)$/i);
+        if (match && match[1]) displayName = match[1];
+        else {
+           const basic = filename.replace(/\.[^/.]+$/, "");
+           if (basic) displayName = basic;
+        }
+      } catch {}
+      return { name: displayName, url: docUrl };
+    });
+  }
+  if (Array.isArray(data)) return data;
+  return [];
 };
 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, children, isConfirming, variant = 'danger' }: any) => {
@@ -69,18 +100,18 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, children, isConfirmin
         <div className="text-slate-600 mb-8">
           {children}
         </div>
-        <div className="flex justify-end gap-3">
-          <button 
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
+          <button
             onClick={onClose}
             disabled={isConfirming}
-            className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-2xl font-medium text-slate-600 bg-slate-100 sm:bg-transparent hover:bg-slate-200/50 transition-colors disabled:opacity-50"
           >
             ยกเลิก
           </button>
           <button
             onClick={onConfirm}
             disabled={isConfirming}
-            className={`px-6 py-3 rounded-2xl font-medium text-white transition-all flex items-center justify-center w-32 disabled:opacity-50 ${selectedVariant.buttonClass}`}
+            className={`w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-2xl font-medium text-white transition-all flex items-center justify-center sm:min-w-[120px] disabled:opacity-50 ${selectedVariant.buttonClass}`}
           >
             {isConfirming ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'ยืนยัน'}
           </button>
@@ -98,6 +129,7 @@ type Dropdowns = {
   taskState: DropdownOption[];
   lawyer: DropdownOption[];
   fineType: DropdownOption[];
+  uploadFileTypes: DropdownOption[];
 };
 
 // --- Components ---
@@ -118,7 +150,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder, required
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter((opt: any) => 
+  const filteredOptions = options.filter((opt: any) =>
     (opt.label || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -126,7 +158,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder, required
 
   return (
     <div className="relative" ref={wrapperRef}>
-      <div 
+      <div
         className={`flex items-center justify-between w-full px-4 py-3 bg-white/50 backdrop-blur-md border ${isOpen ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} rounded-2xl cursor-pointer transition-all duration-200`}
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -138,7 +170,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder, required
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -148,7 +180,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder, required
             <div className="p-2 border-b border-slate-100">
               <div className="flex items-center px-3 py-2 bg-slate-100/50 rounded-xl">
                 <Search className="w-4 h-4 text-slate-400 mr-2" />
-                <input 
+                <input
                   type="text"
                   className="w-full bg-transparent border-none outline-none text-sm text-slate-700 placeholder-slate-400"
                   placeholder="ค้นหา..."
@@ -161,7 +193,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder, required
             <div className="max-h-60 overflow-y-auto p-2">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((opt: any) => (
-                  <div 
+                  <div
                     key={opt.id}
                     className={`px-4 py-2.5 rounded-xl cursor-pointer text-sm transition-colors ${value === opt.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-slate-50 text-slate-700'}`}
                     onClick={() => {
@@ -185,8 +217,70 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder, required
   );
 };
 
+const CreatableAutocomplete = ({ options = [], value, onChange, placeholder, required = false }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter((opt: any) =>
+    (opt.label || "").toLowerCase().includes((value || "").toLowerCase())
+  );
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <input
+        type="text"
+        required={required}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        placeholder={placeholder}
+        className="w-full px-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400"
+      />
+      <ChevronDown className={`absolute right-3 top-3 w-5 h-5 text-slate-400 transition-transform duration-200 pointer-events-none ${isOpen ? 'rotate-180' : ''}`} />
+
+      <AnimatePresence>
+        {isOpen && filteredOptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-[100] w-full mt-1 bg-white/95 backdrop-blur-xl border border-slate-100 rounded-xl shadow-lg max-h-48 overflow-y-auto"
+          >
+            {filteredOptions.map((opt: any) => (
+               <div
+                  key={opt.id}
+                  className="px-4 py-2.5 cursor-pointer text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                  onClick={() => {
+                    onChange(opt.label);
+                    setIsOpen(false);
+                  }}
+               >
+                 {opt.label}
+               </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // Reusable Form Fields Component
-const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEditMode = false }: any) => {
+const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isEditMode = false }: any) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -199,7 +293,7 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
           <FileText className="w-5 h-5 text-blue-500" /> ข้อมูลทั่วไป
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ประเภทงาน <span className="text-red-500">*</span></label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -207,11 +301,10 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'car_crash' })}
-                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${
-                  formData.taskType === 'car_crash' 
-                    ? 'border-blue-500 bg-blue-50/50 text-blue-700' 
+                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'car_crash'
+                    ? 'border-blue-500 bg-blue-50/50 text-blue-700'
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
-                } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <Car className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
                 <span className="text-xs sm:text-sm font-medium text-center leading-tight">รถยนต์ชนเสา</span>
@@ -220,11 +313,10 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'overdue_payment' })}
-                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${
-                  formData.taskType === 'overdue_payment' 
-                    ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700' 
+                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'overdue_payment'
+                    ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700'
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
-                } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
                 <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าไฟฟ้าค้างชำระ</span>
@@ -233,11 +325,10 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'fine', fn_additionalFees: [] })}
-                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${
-                  formData.taskType === 'fine' 
-                    ? 'border-amber-500 bg-amber-50/50 text-amber-700' 
+                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'fine'
+                    ? 'border-amber-500 bg-amber-50/50 text-amber-700'
                     : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
-                } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <Gavel className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
                 <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าไฟฟ้าปรับปรุง</span>
@@ -248,10 +339,10 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ต้นทางเอกสาร <span className="text-red-500">*</span></label>
-            <SearchableSelect 
-              options={dropdowns.source} 
-              value={formData.source} 
-              onChange={(val: string) => setFormData({ ...formData, source: val })} 
+            <SearchableSelect
+              options={dropdowns.source}
+              value={formData.source}
+              onChange={(val: string) => setFormData({ ...formData, source: val })}
               placeholder="เลือกต้นทางเอกสาร..."
               required
             />
@@ -269,10 +360,10 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ผลการตรวจเอกสาร <span className="text-red-500">*</span></label>
-            <SearchableSelect 
-              options={dropdowns.docState} 
-              value={formData.docState} 
-              onChange={(val: string) => setFormData({ ...formData, docState: val })} 
+            <SearchableSelect
+              options={dropdowns.docState}
+              value={formData.docState}
+              onChange={(val: string) => setFormData({ ...formData, docState: val })}
               placeholder="เลือกผลการตรวจ..."
               required
             />
@@ -284,11 +375,16 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
           </div>
 
           <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700 ml-1">เลขที่ อนุมัติฟ้อง</label>
+            <input type="text" name="approvalDocNumber" value={formData.approvalDocNumber || ""} onChange={handleChange} placeholder="(ถ้ามี)" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder-slate-400" />
+          </div>
+
+          <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">สถานะงาน <span className="text-red-500">*</span></label>
-            <SearchableSelect 
-              options={dropdowns.taskState} 
-              value={formData.taskState} 
-              onChange={(val: string) => setFormData({ ...formData, taskState: val })} 
+            <SearchableSelect
+              options={dropdowns.taskState}
+              value={formData.taskState}
+              onChange={(val: string) => setFormData({ ...formData, taskState: val })}
               placeholder="เลือกสถานะงาน..."
               required
             />
@@ -296,10 +392,10 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ผู้รับผิดชอบ <span className="text-red-500">*</span></label>
-            <SearchableSelect 
-              options={dropdowns.lawyer} 
-              value={formData.lawyer} 
-              onChange={(val: string) => setFormData({ ...formData, lawyer: val })} 
+            <SearchableSelect
+              options={dropdowns.lawyer}
+              value={formData.lawyer}
+              onChange={(val: string) => setFormData({ ...formData, lawyer: val })}
               placeholder="เลือกทนายผู้รับผิดชอบ..."
               required
             />
@@ -307,41 +403,103 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium text-slate-700 ml-1">เอกสารจากศาล (อัปโหลดขึ้น Supabase Storage)</label>
-            {formData.courtDocument && !file ? (
-              <div className="flex flex-col items-center gap-3 py-6 bg-white/40 border-2 border-slate-200 rounded-2xl">
-                <a
-                  href={formData.courtDocument}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30 transition-all"
-                >
-                  <FileText className="w-5 h-5" /> เปิดดูเอกสารที่อัปโหลดแล้ว
-                </a>
-                <button
-                  type="button"
-                  onClick={() => { const el = document.getElementById('file-upload'); el?.click(); }}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  <Upload className="w-4 h-4" /> อัปโหลดไฟล์ใหม่แทนที่
-                </button>
-                <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-              </div>
-            ) : (
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 border-dashed rounded-2xl bg-white/30 hover:bg-white/50 transition-colors relative">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-slate-400" />
-                  <div className="flex text-sm text-slate-600 justify-center">
-                    <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
-                      <span>อัปโหลดไฟล์</span>
-                      <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                    </label>
-                    <p className="pl-1">หรือลากวางที่นี่</p>
+            <div className="mt-1 flex flex-col gap-4">
+              
+              {/* Existing (kept) files */}
+              {formData.keptDocuments && formData.keptDocuments.length > 0 && (
+                <div className="space-y-2 px-6 pt-5 pb-6 border-2 border-slate-200 rounded-2xl bg-slate-50/50">
+                  <p className="text-sm font-medium text-slate-600">เอกสารที่อัปโหลดแล้ว:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {formData.keptDocuments.map((doc: any, idx: number) => {
+                      return (
+                        <div key={idx} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium truncate max-w-[200px]" title={doc.url}>
+                            <FileText className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{doc.name}</span>
+                          </a>
+                          <button type="button" onClick={() => setFormData({ ...formData, keptDocuments: formData.keptDocuments.filter((_: any, i: number) => i !== idx) })} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-slate-500">PDF, PNG, JPG ไม่เกิน 10MB</p>
-                  {file && <p className="text-sm font-medium text-emerald-600 mt-2 bg-emerald-50 py-1 px-3 rounded-full inline-block">{file.name}</p>}
                 </div>
+              )}
+
+              {/* Newly selected files */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                   <p className="text-sm font-medium text-slate-600">เอกสารใหม่ที่จะอัปโหลด:</p>
+                   <button
+                     type="button"
+                     onClick={() => setFiles([...(files || []), { id: crypto.randomUUID(), description: '', file: null }])}
+                     className="flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl transition-colors font-medium border border-blue-200/50"
+                   >
+                     <Plus className="w-4 h-4" /> เพิ่มเอกสาร
+                   </button>
+                </div>
+                
+                {files && files.map((fObj: any, idx: number) => (
+                   <div key={fObj.id || idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 bg-white/50 border border-slate-200 rounded-2xl shadow-sm overflow-visible">
+                     <div className="sm:col-span-4 space-y-1">
+                        <label className="text-xs font-semibold text-slate-600 ml-1">ชื่อเอกสาร / คำอธิบาย <span className="text-red-500">*</span></label>
+                        <CreatableAutocomplete
+                          options={dropdowns?.uploadFileTypes || []}
+                          value={fObj.description}
+                          required={true}
+                          placeholder="เช่น หนังสือมอบอำนาจ"
+                          onChange={(val: string) => {
+                            const newFiles = [...files];
+                            newFiles[idx].description = val;
+                            setFiles(newFiles);
+                          }}
+                        />
+                     </div>
+                     <div className="sm:col-span-7 space-y-1">
+                        <label className="text-xs font-semibold text-slate-600 ml-1">ไฟล์แนบ <span className="text-red-500">*</span></label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            required
+                            onChange={(e) => {
+                              const newFiles = [...files];
+                              if (e.target.files && e.target.files.length > 0) {
+                                newFiles[idx].file = e.target.files[0];
+                                if (!newFiles[idx].description) {
+                                  newFiles[idx].description = e.target.files[0].name.split('.')[0];
+                                }
+                              } else {
+                                newFiles[idx].file = null;
+                              }
+                              setFiles(newFiles);
+                            }}
+                            className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all cursor-pointer"
+                          />
+                        </div>
+                     </div>
+                     <div className="sm:col-span-1 flex justify-end pb-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newFiles = [...files];
+                            newFiles.splice(idx, 1);
+                            setFiles(newFiles);
+                          }}
+                          className="p-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                     </div>
+                   </div>
+                ))}
+                {(!files || files.length === 0) && (
+                   <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm bg-white/30">
+                     ยังไม่มีเอกสารใหม่ (กดปุ่มลอยด้านบนขวาเพื่อเพิ่ม)
+                   </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="space-y-2 md:col-span-2">
@@ -354,7 +512,7 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
       {/* Specific Info Section */}
       <AnimatePresence mode="wait">
         {formData.taskType === 'car_crash' && (
-          <motion.section 
+          <motion.section
             key="car_crash"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -386,85 +544,257 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
         )}
 
         {formData.taskType === 'overdue_payment' && (
-          <motion.section 
+          <motion.section
             key="overdue_payment"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
           >
-            <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-emerald-500" /> ข้อมูลคดีค่าไฟฟ้าค้างชำระ
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">เลขที่อ้างอิง (CA) <span className="text-red-500">*</span></label>
-                <input type="text" name="op_ReferenceNumber" required value={formData.op_ReferenceNumber} onChange={handleChange} placeholder="ระบุเลขที่อ้างอิง (CA) " className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-emerald-500" /> ข้อมูลคดีค่าไฟฟ้าค้างชำระ
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const newDetails = [...(formData.op_details || [])];
+                  newDetails.push({ op_ReferenceNumber: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '' });
+                  setFormData({ ...formData, op_details: newDetails });
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl transition-colors font-medium"
+              >
+                <Plus className="w-4 h-4" /> เพิ่มรายการ CA
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
-                <input type="text" name="op_customerName" required value={formData.op_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
+                <input type="text" name="op_customerName" required value={formData.op_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">บิลที่ค้าง (ตั้งแต่) <span className="text-red-500">*</span></label>
-                <input type="date" name="op_OverdueBillStart" required value={formData.op_OverdueBillStart} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-700" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">บิลที่ค้าง (ถึง) <span className="text-red-500">*</span></label>
-                <input type="date" name="op_overdueBillEnd" required value={formData.op_overdueBillEnd} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-700" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">จำนวนเงิน (บาท) <span className="text-red-500">*</span></label>
-                <input type="number" name="op_amount" required value={formData.op_amount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder-slate-400" />
-              </div>
+
+              {(formData.op_details || []).map((detail: any, index: number) => (
+                <div key={index} className="relative p-4 sm:p-8 rounded-3xl border border-slate-200 bg-white/80 shadow-sm space-y-6 transition-all hover:shadow-md w-full">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-lg">รายการที่ {index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newDetails = [...formData.op_details];
+                        newDetails.splice(index, 1);
+                        setFormData({ ...formData, op_details: newDetails });
+                      }}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">เลขที่อ้างอิง (CA) <span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        value={detail.op_ReferenceNumber}
+                        onChange={(e) => {
+                          const newDetails = [...formData.op_details];
+                          newDetails[index].op_ReferenceNumber = e.target.value;
+                          setFormData({ ...formData, op_details: newDetails });
+                        }}
+                        placeholder="ระบุเลขที่อ้างอิง (CA)"
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">จำนวนเงิน (บาท) <span className="text-red-500">*</span></label>
+                      <input
+                        type="number"
+                        required
+                        value={detail.op_amount}
+                        onChange={(e) => {
+                          const newDetails = [...formData.op_details];
+                          newDetails[index].op_amount = e.target.value;
+                          setFormData({ ...formData, op_details: newDetails });
+                        }}
+                        placeholder="0.00"
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลที่ค้าง (ตั้งแต่) <span className="text-red-500">*</span></label>
+                      <input
+                        type="month"
+                        required
+                        value={detail.op_OverdueBillStart}
+                        onChange={(e) => {
+                          const newDetails = [...formData.op_details];
+                          newDetails[index].op_OverdueBillStart = e.target.value;
+                          setFormData({ ...formData, op_details: newDetails });
+                        }}
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลที่ค้าง (ถึง) <span className="text-red-500">*</span></label>
+                      <input
+                        type="month"
+                        required
+                        value={detail.op_overdueBillEnd}
+                        onChange={(e) => {
+                          const newDetails = [...formData.op_details];
+                          newDetails[index].op_overdueBillEnd = e.target.value;
+                          setFormData({ ...formData, op_details: newDetails });
+                        }}
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(!formData.op_details || formData.op_details.length === 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2 md:col-span-2 text-center py-4 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    ยังไม่มีข้อมูล CA (กดปุ่มเพิ่มรายการ CA ด้านบน)
+                  </div>
+                </div>
+              )}
             </div>
           </motion.section>
         )}
 
         {formData.taskType === 'fine' && (
-          <motion.section 
+          <motion.section
             key="fine"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
           >
-            <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2">
-              <Gavel className="w-5 h-5 text-amber-500" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">ประเภทค่าปรับ <span className="text-red-500">*</span></label>
-                <SearchableSelect 
-                  options={dropdowns.fineType} 
-                  value={formData.fn_fineType} 
-                  onChange={(val: string) => setFormData({ ...formData, fn_fineType: val })} 
-                  placeholder="เลือกประเภทค่าปรับ..."
-                  required
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <Gavel className="w-5 h-5 text-amber-500" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const newDetails = [...(formData.fn_details || [])];
+                  newDetails.push({ fn_fineType: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '' });
+                  setFormData({ ...formData, fn_details: newDetails });
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-xl transition-colors font-medium"
+              >
+                <Plus className="w-4 h-4" /> เพิ่มรายการ CA
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
-                <input type="text" name="fn_customerName" required value={formData.fn_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">หมายเลขอ้างอิง (CA)  <span className="text-red-500">*</span></label>
-                <input type="text" name="fn_ReferenceNumber" required value={formData.fn_ReferenceNumber} onChange={handleChange} placeholder="ระบุหมายเลขอ้างอิง (CA) " className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">บิลเดือนเป็นช่วง (ตั้งแต่) <span className="text-red-500">*</span></label>
-                <input type="date" name="fn_OverdueBillStart" required value={formData.fn_OverdueBillStart} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-700" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">บิลเดือนเป็นช่วง (ถึง) <span className="text-red-500">*</span></label>
-                <input type="date" name="fn_OverdueBillEnd" required value={formData.fn_OverdueBillEnd} onChange={handleChange} className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-700" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700 ml-1">ค่าเบี้ยปรับละเมิด (บาท) <span className="text-red-500">*</span></label>
-                <input type="number" name="fn_amount" required value={formData.fn_amount} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
+                <input type="text" name="fn_customerName" required value={formData.fn_customerName} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder-slate-400" />
               </div>
 
-              <div className="space-y-2 md:col-span-2">
+              {(formData.fn_details || []).map((detail: any, index: number) => (
+                <div key={index} className="relative p-4 sm:p-8 rounded-3xl border border-slate-200 bg-white/80 shadow-sm space-y-6 transition-all hover:shadow-md w-full">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <span className="text-xs font-bold text-amber-600 uppercase tracking-wider bg-amber-50 px-3 py-1.5 rounded-lg">รายการที่ {index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newDetails = [...formData.fn_details];
+                        newDetails.splice(index, 1);
+                        setFormData({ ...formData, fn_details: newDetails });
+                      }}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                    <div className="space-y-1.5 md:col-span-2 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">ประเภทค่าปรับ <span className="text-red-500">*</span></label>
+                      <SearchableSelect
+                        options={dropdowns.fineType}
+                        value={detail.fn_fineType}
+                        onChange={(val: string) => {
+                          const newDetails = [...formData.fn_details];
+                          newDetails[index].fn_fineType = val;
+                          setFormData({ ...formData, fn_details: newDetails });
+                        }}
+                        placeholder="เลือกประเภทค่าปรับ..."
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">หมายเลขอ้างอิง (CA) <span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        value={detail.fn_ReferenceNumber}
+                        onChange={(e) => {
+                          const newDetails = [...formData.fn_details];
+                          newDetails[index].fn_ReferenceNumber = e.target.value;
+                          setFormData({ ...formData, fn_details: newDetails });
+                        }}
+                        placeholder="ระบุหมายเลขอ้างอิง (CA)"
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">ค่าเบี้ยปรับละเมิด (บาท) <span className="text-red-500">*</span></label>
+                      <input
+                        type="number"
+                        required
+                        value={detail.fn_amount}
+                        onChange={(e) => {
+                          const newDetails = [...formData.fn_details];
+                          newDetails[index].fn_amount = e.target.value;
+                          setFormData({ ...formData, fn_details: newDetails });
+                        }}
+                        placeholder="0.00"
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลเดือนเป็นช่วง (ตั้งแต่) <span className="text-red-500">*</span></label>
+                      <input
+                        type="month"
+                        required
+                        value={detail.fn_OverdueBillStart}
+                        onChange={(e) => {
+                          const newDetails = [...formData.fn_details];
+                          newDetails[index].fn_OverdueBillStart = e.target.value;
+                          setFormData({ ...formData, fn_details: newDetails });
+                        }}
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลเดือนเป็นช่วง (ถึง) <span className="text-red-500">*</span></label>
+                      <input
+                        type="month"
+                        required
+                        value={detail.fn_OverdueBillEnd}
+                        onChange={(e) => {
+                          const newDetails = [...formData.fn_details];
+                          newDetails[index].fn_OverdueBillEnd = e.target.value;
+                          setFormData({ ...formData, fn_details: newDetails });
+                        }}
+                        className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(!formData.fn_details || formData.fn_details.length === 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center py-4 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  ยังไม่มีข้อมูล CA (กดปุ่มเพิ่มรายการ CA ด้านบน)
+                </div>
+              )}
+
+              <div className="space-y-2 mt-4 pt-4 border-t border-slate-200">
                 <div className="flex items-center justify-between mb-4">
                   <label className="text-sm font-medium text-slate-700">ค่าอื่นๆ</label>
                   <button
@@ -520,13 +850,13 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
                 </div>
               </div>
 
-              <div className="space-y-2 md:col-span-2 pt-4 border-t border-slate-200">
+              <div className="space-y-2 pt-4 border-t border-slate-200">
                 <label className="text-sm font-semibold text-slate-800">รวมค่าเสียหายทั้งหมด</label>
                 <div className="text-3xl font-bold text-amber-600">
                   {(() => {
-                    const baseFine = parseFloat(formData.fn_amount || '0') || 0;
+                    const baseFineSum = (formData.fn_details || []).reduce((sum: number, d: any) => sum + (parseFloat(d.fn_amount) || 0), 0);
                     const additionalSum = (formData.fn_additionalFees || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
-                    return (baseFine + additionalSum).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return (baseFineSum + additionalSum).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                   })()}
                   {' '}<span className="text-lg">บาท</span>
                 </div>
@@ -541,6 +871,34 @@ const CaseFormFields = ({ formData, setFormData, file, setFile, dropdowns, isEdi
 
 // Edit Modal Component
 const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
+  // Ensure op_details is always an array
+  const parseOpDetails = (val: any): any[] => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  // Ensure fn_details is always an array
+  const parseFnDetails = (val: any): any[] => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
   // Ensure fn_additionalFees is always an array
   const parseFnAdditionalFees = (val: any): any[] => {
     if (Array.isArray(val)) return val;
@@ -562,36 +920,56 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     docNumber: caseData.docNumber || "",
     docState: caseData.docState || "",
     returnDocNumber: caseData.returnDocNumber || "",
+    approvalDocNumber: caseData.approvalDocNumber || "",
     taskState: caseData.taskState || "",
     lawyer: caseData.lawyer || "",
-    licensePlate: caseData.licensePlate || "",
-    driverName: caseData.driverName || "",
-    damageAmount: caseData.damageAmount || "",
-    referenceNumber: caseData.referenceNumber || "",
-    overdueBillStart: caseData.overdueBillStart || "",
-    overdueBillEnd: caseData.overdueBillEnd || "",
-    amount: caseData.amount || "",
-    additionalFees: caseData.additionalFees || [],
-    cc_licensePlate: caseData.cc_licensePlate || "",
-    cc_driverName: caseData.cc_driverName || "",
-    cc_ReferenceNumber: caseData.cc_ReferenceNumber || "",
-    cc_damageAmount: caseData.cc_damageAmount || "",
-    op_ReferenceNumber: caseData.op_ReferenceNumber || "",
-    op_customerName: caseData.op_customerName || "",
-    op_OverdueBillStart: caseData.op_OverdueBillStart || "",
-    op_overdueBillEnd: caseData.op_overdueBillEnd || "",
-    op_amount: caseData.op_amount || "",
+    cc_licensePlate: caseData.cc_licensePlate || caseData.licensePlate || "",
+    cc_driverName: caseData.cc_driverName || caseData.driverName || "",
+    cc_ReferenceNumber: caseData.cc_ReferenceNumber || caseData.referenceNumber || "",
+    cc_damageAmount: caseData.cc_damageAmount || caseData.damageAmount || "",
+    op_ReferenceNumber: caseData.op_ReferenceNumber || caseData.referenceNumber || "",
+    op_customerName: caseData.op_customerName || caseData.driverName || "",
+    op_OverdueBillStart: caseData.op_OverdueBillStart || caseData.overdueBillStart || "",
+    op_overdueBillEnd: caseData.op_overdueBillEnd || caseData.overdueBillEnd || "",
+    op_amount: caseData.op_amount || caseData.amount || "",
+    op_details: (() => {
+      const details = parseOpDetails(caseData.op_details);
+      if (details.length === 0 && (caseData.op_ReferenceNumber || caseData.op_amount || caseData.referenceNumber || caseData.amount)) {
+        return [{
+          op_ReferenceNumber: caseData.op_ReferenceNumber || caseData.referenceNumber || "",
+          op_OverdueBillStart: caseData.op_OverdueBillStart || caseData.overdueBillStart || "",
+          op_overdueBillEnd: caseData.op_overdueBillEnd || caseData.overdueBillEnd || "",
+          op_amount: caseData.op_amount || caseData.amount || ""
+        }];
+      }
+      return details;
+    })(),
+    fn_customerName: caseData.fn_customerName || caseData.driverName || "",
     fn_fineType: caseData.fn_fineType || "",
     fn_fineTypeName: caseData.fn_fineTypeName || "",
-    fn_ReferenceNumber: caseData.fn_ReferenceNumber || "",
-    fn_OverdueBillStart: caseData.fn_OverdueBillStart || "",
-    fn_OverdueBillEnd: caseData.fn_OverdueBillEnd || "",
-    fn_amount: caseData.fn_amount || "",
+    fn_ReferenceNumber: caseData.fn_ReferenceNumber || caseData.referenceNumber || "",
+    fn_OverdueBillStart: caseData.fn_OverdueBillStart || caseData.overdueBillStart || "",
+    fn_OverdueBillEnd: caseData.fn_OverdueBillEnd || caseData.overdueBillEnd || "",
+    fn_amount: caseData.fn_amount || caseData.amount || "",
     fn_additionalFees: parseFnAdditionalFees(caseData.fn_additionalFees),
+    fn_details: (() => {
+      const details = parseFnDetails(caseData.fn_details);
+      if (details.length === 0 && (caseData.fn_ReferenceNumber || caseData.fn_amount || caseData.referenceNumber || caseData.amount)) {
+        return [{
+          fn_fineType: caseData.fn_fineType || "",
+          fn_ReferenceNumber: caseData.fn_ReferenceNumber || caseData.referenceNumber || "",
+          fn_OverdueBillStart: caseData.fn_OverdueBillStart || caseData.overdueBillStart || "",
+          fn_OverdueBillEnd: caseData.fn_OverdueBillEnd || caseData.overdueBillEnd || "",
+          fn_amount: caseData.fn_amount || caseData.amount || ""
+        }];
+      }
+      return details;
+    })(),
     notes: caseData.notes || "",
     courtDocument: caseData.courtDocument || "",
+    keptDocuments: parseCourtDocuments(caseData.courtDocument),
   });
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -606,23 +984,31 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
     try {
       const data = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
-        if (key === 'fn_additionalFees' && Array.isArray(value)) {
-          // Serialize array to JSON string
+        if (key === 'keptDocuments' || key === 'courtDocument' || key === 'courtDocuments') return;
+        if (Array.isArray(value)) {
           data.append(key, JSON.stringify(value));
         } else {
           data.append(key, value as string);
         }
       });
-      
+
       // Calculate and add total fine amount (base + additional fees)
       if (formData.taskType === 'fine') {
-        const baseFine = parseFloat(formData.fn_amount || '0') || 0;
+        const baseFineSum = (formData.fn_details || []).reduce((sum: number, d: any) => sum + (parseFloat(d.fn_amount) || 0), 0);
         const additionalSum = (formData.fn_additionalFees || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
-        const totalAmount = baseFine + additionalSum;
+        const totalAmount = baseFineSum + additionalSum;
         data.append('fn_totalAmount', String(totalAmount));
       }
-      
-      if (file) data.append("courtDocument", file);
+
+      if (files && files.length > 0) {
+        files.forEach((f: any) => {
+          if (f.file) {
+            data.append("courtDocuments", f.file);
+            data.append("documentDescriptions", f.description || f.file.name);
+          }
+        });
+      }
+      data.append("keptDocuments", JSON.stringify(formData.keptDocuments || []));
 
       const response = await fetch(`/api/cases/${caseData.id}`, {
         method: "PUT",
@@ -701,14 +1087,14 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
-      <motion.div 
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-6 bg-slate-900/60 backdrop-blur-sm transition-all">
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40 mx-2 sm:mx-0"
+        className="bg-[#F2F2F7]/95 sm:bg-[#F2F2F7]/95 backdrop-blur-3xl sm:rounded-3xl rounded-t-3xl shadow-2xl w-full max-w-5xl h-[95dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col border border-white/40"
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 bg-white/50 border-b border-slate-200/50">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 bg-white/50 border-b border-slate-200/50 w-full">
           <h2 className="text-lg sm:text-2xl font-semibold text-slate-800 flex items-center gap-2 min-w-0">
             <Edit2 className="w-6 h-6 text-indigo-500" />
             <span className="min-w-0 break-words">แก้ไขข้อมูลคดี {caseData.docNumber}</span>
@@ -722,8 +1108,8 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
             >
               <Download className="w-4 h-4" /> {isDownloadingWord ? "กำลังสร้าง..." : "ดาวน์โหลด Word"}
             </button>
-            <button 
-              onClick={handleArchive} 
+            <button
+              onClick={handleArchive}
               disabled={isArchiving}
               className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl transition-colors text-sm font-medium whitespace-nowrap"
             >
@@ -734,34 +1120,34 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
             </button>
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <form id="edit-form" onSubmit={handleSubmit}>
-            <CaseFormFields 
-              formData={formData} 
-              setFormData={setFormData} 
-              file={file} 
-              setFile={setFile} 
-              dropdowns={dropdowns} 
+            <CaseFormFields
+              formData={formData}
+              setFormData={setFormData}
+              files={files}
+              setFiles={setFiles}
+              dropdowns={dropdowns}
               isEditMode={true}
             />
           </form>
         </div>
 
-        <div className="p-4 sm:p-6 bg-white/50 border-t border-slate-200/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center">
+        <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-md border-t border-slate-200/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center shrink-0 safe-pb">
           <div className="w-full sm:w-auto">
             <button
               onClick={() => setIsConfirmOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors text-sm font-medium w-full sm:w-auto"
+              className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-2xl sm:rounded-xl transition-colors text-sm font-medium w-full sm:w-auto"
             >
-              <Trash2 className="w-4 h-4" /> ลบ
+              <Trash2 className="w-4 h-4" /> ลบข้อมูล
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <button type="button" onClick={onClose} className="px-6 py-3 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors w-full sm:w-auto">
+            <button type="button" onClick={onClose} className="px-6 py-3.5 sm:py-3 rounded-2xl font-medium text-slate-600 bg-slate-100 sm:bg-transparent hover:bg-slate-200/50 transition-colors w-full sm:w-auto">
               ยกเลิก
             </button>
-            <button type="submit" form="edit-form" disabled={isSubmitting} className="px-6 py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-70 w-full sm:w-auto">
+            <button type="submit" form="edit-form" disabled={isSubmitting} className="px-6 py-3.5 sm:py-3 rounded-2xl font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl shadow-blue-500/20 transition-all disabled:opacity-70 w-full sm:w-auto">
               {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
             </button>
           </div>
@@ -793,7 +1179,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
           >
             <p>คุณแน่ใจหรือไม่ว่าต้องการจัดเก็บ (Archive) คดีนี้?</p>
             <div className="flex items-center gap-2 mt-4 bg-slate-100 p-3 rounded-lg">
-              <input 
+              <input
                 type="checkbox"
                 id="isFinishCheckbox"
                 checked={isFinishOnArchive}
@@ -1052,7 +1438,7 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
 
   const activeCases = cases.filter(c => !isArchivedValue(c.isArchived));
   const [selectedCase, setSelectedCase] = useState<any>(null);
-  
+
   const columns = [
     { id: '1', title: 'รับเรื่อง', color: 'bg-blue-50 border-blue-200 text-blue-700' },
     { id: '2', title: 'กำลังดำเนินการ', color: 'bg-amber-50 border-amber-200 text-amber-700' },
@@ -1096,11 +1482,11 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
                   <span>{column.title}</span>
                   <span className="bg-white/50 px-2.5 py-0.5 rounded-full text-sm">{columnCases.length}</span>
                 </div>
-                
+
                 <Droppable droppableId={column.id}>
                   {(provided, snapshot) => (
-                    <div 
-                      ref={provided.innerRef} 
+                    <div
+                      ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`flex-1 p-3 overflow-y-auto transition-colors rounded-b-3xl ${snapshot.isDraggingOver ? 'bg-slate-100/50' : ''}`}
                     >
@@ -1117,8 +1503,7 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
                                 ...(provided.draggableProps.style as any),
                                 zIndex: snapshot.isDragging ? 9999 : undefined,
                               }}
-                              className={`mb-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all ${
-                                  snapshot.isDragging ? 'shadow-xl' : 'hover:shadow-md hover:border-blue-300'
+                              className={`mb-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all ${snapshot.isDragging ? 'shadow-xl' : 'hover:shadow-md hover:border-blue-300'
                                 }`}
                             >
                               <div className="flex justify-between items-start mb-2">
@@ -1152,14 +1537,14 @@ const KanbanBoard = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: 
 
       <AnimatePresence>
         {selectedCase && (
-          <EditModal 
-            caseData={selectedCase} 
+          <EditModal
+            caseData={selectedCase}
             dropdowns={dropdowns}
-            onClose={() => setSelectedCase(null)} 
+            onClose={() => setSelectedCase(null)}
             onSaveSuccess={() => {
               setSelectedCase(null);
               onUpdate();
-            }} 
+            }}
           />
         )}
       </AnimatePresence>
@@ -1213,12 +1598,12 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-6 bg-slate-900/60 backdrop-blur-sm transition-all">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-[#F2F2F7]/95 backdrop-blur-3xl rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-white/40 mx-2 sm:mx-0 mt-4 sm:mt-0"
+        className="bg-[#F2F2F7]/95 sm:bg-[#F2F2F7]/95 backdrop-blur-3xl sm:rounded-3xl rounded-t-3xl shadow-2xl w-full max-w-3xl h-[95dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col border border-white/40"
       >
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-5 sm:p-6 bg-white/50 border-b border-slate-200/50">
@@ -1265,20 +1650,27 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               <Field label="เลขที่หนังสือ" value={caseData.docNumber} />
               <Field label="ผลการตรวจเอกสาร" value={caseData.docStateName} />
               <Field label="เลขที่คืนเอกสาร" value={caseData.returnDocNumber} />
+              <Field label="เลขที่ อนุมัติฟ้อง" value={caseData.approvalDocNumber} />
               <Field label="สถานะงาน" value={caseData.taskStateName} />
               <Field label="ผู้รับผิดชอบ" value={caseData.lawyerName} />
               {caseData.notes && <div className="sm:col-span-2"><Field label="หมายเหตุ" value={caseData.notes} /></div>}
               {caseData.courtDocument && (
-                <div className="sm:col-span-2 space-y-1">
+                <div className="sm:col-span-2 space-y-2">
                   <p className="text-[11px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">เอกสารจากศาล</p>
-                  <a
-                    href={caseData.courtDocument}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-xl border border-indigo-100 transition-colors font-medium max-w-full break-words"
-                  >
-                    <FileText className="w-4 h-4" /> เปิดเอกสาร (Google Drive)
-                  </a>
+                  <div className="flex flex-wrap gap-2">
+                    {parseCourtDocuments(caseData.courtDocument).map((doc: any, idx: number) => (
+                      <a
+                        key={idx}
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-xl border border-indigo-100 transition-colors font-medium max-w-full break-words"
+                        title={doc.url}
+                      >
+                        <FileText className="w-4 h-4 shrink-0" /> {doc.name}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1304,12 +1696,38 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-emerald-400" /> ข้อมูลคดีค่าไฟฟ้าค้างชำระ
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="เลขที่อ้างอิง (CA)" value={caseData.op_ReferenceNumber} />
+              <div className="grid grid-cols-1 gap-4">
                 <Field label="ชื่อนามสกุล" value={caseData.op_customerName} />
-                <Field label="บิลที่ค้าง (ตั้งแต่)" value={caseData.op_OverdueBillStart} />
-                <Field label="บิลที่ค้าง (ถึง)" value={caseData.op_overdueBillEnd} />
-                <Field label="จำนวนเงิน (บาท)" value={caseData.op_amount ? Number(caseData.op_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+
+                {caseData.op_details && Array.isArray(caseData.op_details) && caseData.op_details.length > 0 ? (
+                  <div className="mt-2 space-y-3">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">รายการ CA ทั้งหมด</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {caseData.op_details.map((detail: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100/50">
+                          <p className="text-[10px] font-bold text-emerald-600 mb-2">CA: {detail.op_ReferenceNumber}</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <p className="text-slate-500 text-[10px]">ตั้งแต่ - ถึง</p>
+                              <p className="font-medium text-slate-700">{detail.op_OverdueBillStart} - {detail.op_overdueBillEnd}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-slate-500 text-[10px]">จำนวนเงิน</p>
+                              <p className="font-bold text-emerald-700">{Number(detail.op_amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="เลขที่อ้างอิง (CA)" value={caseData.op_ReferenceNumber} />
+                    <Field label="บิลที่ค้าง (ตั้งแต่)" value={caseData.op_OverdueBillStart} />
+                    <Field label="บิลที่ค้าง (ถึง)" value={caseData.op_overdueBillEnd} />
+                    <Field label="จำนวนเงิน (บาท)" value={caseData.op_amount ? Number(caseData.op_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -1319,51 +1737,86 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <Gavel className="w-4 h-4 text-amber-400" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="ประเภทค่าปรับ" value={caseData.fn_fineTypeName} />
+              <div className="grid grid-cols-1 gap-4">
                 <Field label="ชื่อนามสกุล" value={caseData.fn_customerName} />
-                <Field label="หมายเลขอ้างอิง (CA)" value={caseData.fn_ReferenceNumber} />
-                <Field label="บิลเดือน (ตั้งแต่)" value={caseData.fn_OverdueBillStart} />
-                <Field label="บิลเดือน (ถึง)" value={caseData.fn_OverdueBillEnd} />
-                <Field label="ค่าเบี้ยปรับ (บาท)" value={caseData.fn_amount ? Number(caseData.fn_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+
+                {caseData.fn_details && Array.isArray(caseData.fn_details) && caseData.fn_details.length > 0 ? (
+                  <div className="mt-2 space-y-3">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">รายการ CA/ค่าปรับ ทั้งหมด</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {caseData.fn_details.map((detail: any, idx: number) => {
+                        return (
+                          <div key={idx} className="p-3 rounded-xl bg-amber-50/50 border border-amber-100/50">
+                            <p className="text-[10px] font-bold text-amber-600 mb-2">CA: {detail.fn_ReferenceNumber}</p>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-slate-500 text-[10px]">ช่วงบิล</p>
+                                <p className="font-medium text-slate-700">{detail.fn_OverdueBillStart} - {detail.fn_OverdueBillEnd}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-slate-500 text-[10px]">ค่าเบี้ยปรับ</p>
+                                <p className="font-bold text-amber-700">{Number(detail.fn_amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="หมายเลขอ้างอิง (CA)" value={caseData.fn_ReferenceNumber} />
+                    <Field label="บิลเดือนเป็นช่วง (ตั้งแต่)" value={caseData.fn_OverdueBillStart} />
+                    <Field label="บิลเดือนเป็นช่วง (ถึง)" value={caseData.fn_OverdueBillEnd} />
+                    <Field label="ค่าเบี้ยปรับละเมิด (บาท)" value={caseData.fn_amount ? Number(caseData.fn_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+                  </div>
+                )}
+
                 {parseFees(caseData.fn_additionalFees).length > 0 && (
-                  <div className="sm:col-span-2 space-y-1">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">ค่าอื่นๆ</p>
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">ค่าอื่นๆ</p>
                     <div className="space-y-1">
-                      {parseFees(caseData.fn_additionalFees).map((fee: any, i: number) => (
-                        <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm bg-white/60 px-3 py-2 rounded-xl border border-slate-100">
-                          <span className="text-slate-700 break-words">{fee.name}</span>
-                          <span className="font-medium text-slate-800 whitespace-nowrap">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</span>
+                      {parseFees(caseData.fn_additionalFees).map((fee: any, idx: number) => (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span className="text-slate-600">{fee.name}</span>
+                          <span className="font-medium text-slate-800">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                {caseData.fn_totalAmount && (
-                  <div className="sm:col-span-2 pt-3 border-t border-slate-200">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">รวมทั้งหมด</p>
-                    <p className="text-2xl font-bold text-amber-600">{Number(caseData.fn_totalAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</p>
-                  </div>
-                )}
+
+                <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+                  <span className="text-sm font-bold text-slate-700">รวมทั้งสิ้น</span>
+                  <span className="text-lg font-bold text-amber-600">
+                    {(() => {
+                      const baseFineSum = (caseData.fn_details || []).reduce((sum: number, d: any) => sum + (parseFloat(d.fn_amount) || 0), 0);
+                      const baseFineSingle = parseFloat(caseData.fn_amount || '0') || 0;
+                      const additionalSum = (parseFees(caseData.fn_additionalFees) || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
+                      const effectiveBase = (caseData.fn_details && caseData.fn_details.length > 0) ? baseFineSum : baseFineSingle;
+                      return (effectiveBase + additionalSum).toLocaleString('th-TH', { minimumFractionDigits: 2 });
+                    })()} บาท
+                  </span>
+                </div>
               </div>
             </section>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 sm:p-5 bg-white/50 border-t border-slate-200/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center">
+        {/* Footer Actions */}
+        <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-md border-t border-slate-200/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center shrink-0 safe-pb">
           {onUnarchive && (
             <button
               onClick={handleUnarchive}
               disabled={isUnarchiving}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 px-4 py-3.5 sm:py-2.5 rounded-2xl text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50 w-full sm:w-auto"
             >
               <Archive className="w-4 h-4" />
               {isUnarchiving ? 'กำลังดำเนินการ...' : 'ยกเลิกการจัดเก็บ'}
             </button>
           )}
-          <button onClick={onClose} className="px-6 py-2.5 rounded-2xl font-medium text-slate-600 hover:bg-slate-200/50 transition-colors w-full sm:w-auto">
-            ปิด
+          <button onClick={onClose} className="px-6 py-3.5 sm:py-2.5 rounded-2xl font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 transition-colors shadow-sm w-full sm:w-auto sm:ml-auto">
+            ปิดหน้าต่าง
           </button>
         </div>
       </motion.div>
@@ -1411,164 +1864,164 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
 
   return (
     <>
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">เอกสารคดีที่จัดเก็บแล้ว</h2>
-          <p className="text-slate-500 mt-1">รายการคดีที่ถูก Archive ทั้งหมด ({filtered.length} รายการ)</p>
-        </div>
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="ค้นหาเลขที่หนังสือ, ทนาย, ต้นทาง..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-md border border-white/40 shadow-sm rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200/50 bg-slate-50/50">
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">เอกสาร</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ประเภท</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">รายละเอียด</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">สถานะงาน</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">ทนาย</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600">isFinish</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <div className="flex items-center justify-center gap-2 text-slate-400">
-                      <div className="w-5 h-5 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
-                      <span>กำลังโหลดข้อมูล...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : paginated.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3 text-slate-400">
-                      <FolderArchive className="w-12 h-12 text-slate-300" />
-                      <span>ไม่พบข้อมูลเอกสารที่จัดเก็บแล้ว</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((c) => {
-                  const details = getCaseDetails(c);
-                  return (
-                    <tr key={c.id} onClick={() => setSelectedCase(c)} className="border-b border-slate-100 last:border-0 hover:bg-white/80 cursor-pointer transition-colors group">
-                      <td className="px-6 py-4 text-sm text-slate-600">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FileText className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-800 font-medium">{c.docNumber || '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Archive className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-500">{c.sourceName || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {c.taskType === 'car_crash' ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 max-w-full whitespace-normal break-words leading-tight">
-                            <Car className="w-4 h-4 shrink-0" /> <span className="min-w-0">รถชนเสา</span>
-                          </span>
-                        ) : c.taskType === 'fine' ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100 max-w-full whitespace-normal break-words leading-tight">
-                            <Gavel className="w-4 h-4 shrink-0" /> <span className="min-w-0">{details.type}</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-full whitespace-normal break-words leading-tight">
-                            <CreditCard className="w-4 h-4 shrink-0" /> <span className="min-w-0">ค่าไฟฟ้าค้างชำระ</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
-                        <div className="flex items-center gap-2 mb-1">
-                          <User className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-800 font-medium">{details.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Hash className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-500">{details.ref}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border max-w-full whitespace-normal break-words leading-tight
-                            ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' :
-                              c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                              'bg-slate-100 text-slate-700 border-slate-200'}`}
-                          >
-                            {c.taskStateName || '-'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <FileCheck className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 max-w-full whitespace-normal break-words leading-tight">
-                            {c.docStateName || '-'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">{c.lawyerName || '-'}</td>
-                      <td className="px-6 py-4">
-                        {c.isFinish ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 max-w-full whitespace-normal break-words leading-tight">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> เสร็จสิ้นแล้ว
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 max-w-full whitespace-normal break-words leading-tight">
-                            <XCircle className="w-3.5 h-3.5" /> ยังไม่เสร็จ
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-sm text-slate-500">
-              แสดง {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} จาก {filtered.length} รายการ
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-sm font-medium text-slate-700 px-2">{currentPage} / {totalPages}</span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">เอกสารคดีที่จัดเก็บแล้ว</h2>
+            <p className="text-slate-500 mt-1">รายการคดีที่ถูก Archive ทั้งหมด ({filtered.length} รายการ)</p>
           </div>
-        )}
-      </div>
-    </div>
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="ค้นหาเลขที่หนังสือ, ทนาย, ต้นทาง..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-md border border-white/40 shadow-sm rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+            />
+          </div>
+        </div>
 
-    <AnimatePresence>
-      {selectedCase && (
-        <CaseDetailModal
+        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl overflow-hidden">
+          <div className="overflow-x-auto pb-2">
+            <table className="w-full min-w-[800px] text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200/50 bg-slate-50/50">
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">เอกสาร</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">ประเภท</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">รายละเอียด</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">สถานะงาน</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">ทนาย</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">isFinish</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex items-center justify-center gap-2 text-slate-400">
+                        <div className="w-5 h-5 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
+                        <span>กำลังโหลดข้อมูล...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3 text-slate-400">
+                        <FolderArchive className="w-12 h-12 text-slate-300" />
+                        <span>ไม่พบข้อมูลเอกสารที่จัดเก็บแล้ว</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((c) => {
+                    const details = getCaseDetails(c);
+                    return (
+                      <tr key={c.id} onClick={() => setSelectedCase(c)} className="border-b border-slate-100 last:border-0 hover:bg-white/80 cursor-pointer transition-colors group">
+                        <td className="px-6 py-4 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FileText className="w-4 h-4 text-slate-400" />
+                            <span className="text-slate-800 font-medium">{c.docNumber || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Archive className="w-4 h-4 text-slate-400" />
+                            <span className="text-slate-500">{c.sourceName || '-'}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {c.taskType === 'car_crash' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 max-w-full whitespace-normal break-words leading-tight">
+                              <Car className="w-4 h-4 shrink-0" /> <span className="min-w-0">รถชนเสา</span>
+                            </span>
+                          ) : c.taskType === 'fine' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100 max-w-full whitespace-normal break-words leading-tight">
+                              <Gavel className="w-4 h-4 shrink-0" /> <span className="min-w-0">{details.type}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 max-w-full whitespace-normal break-words leading-tight">
+                              <CreditCard className="w-4 h-4 shrink-0" /> <span className="min-w-0">ค่าไฟฟ้าค้างชำระ</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 mb-1">
+                            <User className="w-4 h-4 text-slate-400" />
+                            <span className="text-slate-800 font-medium">{details.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Hash className="w-4 h-4 text-slate-400" />
+                            <span className="text-slate-500">{details.ref}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border max-w-full whitespace-normal break-words leading-tight
+                            ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' :
+                                c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                  'bg-slate-100 text-slate-700 border-slate-200'}`}
+                            >
+                              {c.taskStateName || '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <FileCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 max-w-full whitespace-normal break-words leading-tight">
+                              {c.docStateName || '-'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-600">{c.lawyerName || '-'}</td>
+                        <td className="px-6 py-4">
+                          {c.isFinish ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 max-w-full whitespace-normal break-words leading-tight">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> เสร็จสิ้นแล้ว
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 max-w-full whitespace-normal break-words leading-tight">
+                              <XCircle className="w-3.5 h-3.5" /> ยังไม่เสร็จ
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-sm text-slate-500">
+                แสดง {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} จาก {filtered.length} รายการ
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-medium text-slate-700 px-2">{currentPage} / {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {selectedCase && (
+          <CaseDetailModal
             caseData={selectedCase}
             onClose={() => setSelectedCase(null)}
             onUnarchive={() => {
@@ -1581,9 +2034,9 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
               onUpdate();
             }}
           />
-      )}
-    </AnimatePresence>
-  </>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
@@ -1652,9 +2105,9 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
         <h2 className="text-3xl font-bold text-slate-800 tracking-tight">รายการคดี</h2>
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="ค้นหาเลขที่หนังสือ, ทนาย, ต้นทาง..." 
+          <input
+            type="text"
+            placeholder="ค้นหาเลขที่หนังสือ, ทนาย, ต้นทาง..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-md border border-white/40 shadow-sm rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
@@ -1663,8 +2116,8 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
       </div>
 
       <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto pb-2">
+          <table className="w-full min-w-[800px] text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200/50 bg-slate-50/50">
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">เอกสาร</th>
@@ -1681,8 +2134,8 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                 </tr>
               ) : (
                 paginatedCases.map((c) => (
-                  <tr 
-                    key={c.id} 
+                  <tr
+                    key={c.id}
                     onClick={() => setSelectedCase(c)}
                     className="border-b border-slate-100 last:border-0 hover:bg-white/80 cursor-pointer transition-colors group"
                   >
@@ -1722,12 +2175,12 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border max-w-full whitespace-normal break-words leading-tight
-                          ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' : 
-                            c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' : 
-                            'bg-slate-100 text-slate-700 border-slate-200'}`}
+                      <div className="flex items-center gap-2 mb-1">
+                        <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border max-w-full whitespace-normal break-words leading-tight
+                          ${c.taskStateName === 'เสร็จสิ้น' ? 'bg-green-50 text-green-700 border-green-100' :
+                            c.taskStateName === 'กำลังดำเนินการ' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                              'bg-slate-100 text-slate-700 border-slate-200'}`}
                         >
                           {c.taskStateName}
                         </span>
@@ -1746,15 +2199,15 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between px-4 sm:px-6 py-4 border-t border-slate-200/50 bg-white/40">
-          <span className="text-sm text-slate-500 hidden sm:block">
-            แสดง {(currentPage - 1) * itemsPerPage + 1} ถึง {Math.min(currentPage * itemsPerPage, filteredCases.length)} จาก {filteredCases.length} รายการ
-          </span>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
-              <button 
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between px-4 sm:px-6 py-4 border-t border-slate-200/50 bg-white/40">
+            <span className="text-sm text-slate-500 hidden sm:block">
+              แสดง {(currentPage - 1) * itemsPerPage + 1} ถึง {Math.min(currentPage * itemsPerPage, filteredCases.length)} จาก {filteredCases.length} รายการ
+            </span>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
+              <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
                 className="p-2 rounded-xl hover:bg-white/80 disabled:opacity-50 transition-colors"
@@ -1766,17 +2219,16 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${
-                      currentPage === i + 1 
-                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30' 
+                    className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${currentPage === i + 1
+                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
                         : 'text-slate-600 hover:bg-white/80'
-                    }`}
+                      }`}
                   >
                     {i + 1}
                   </button>
                 ))}
               </div>
-              <button 
+              <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
                 className="p-2 rounded-xl hover:bg-white/80 disabled:opacity-50 transition-colors"
@@ -1790,14 +2242,14 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
 
       <AnimatePresence>
         {selectedCase && (
-          <EditModal 
-            caseData={selectedCase} 
+          <EditModal
+            caseData={selectedCase}
             dropdowns={dropdowns}
-            onClose={() => setSelectedCase(null)} 
+            onClose={() => setSelectedCase(null)}
             onSaveSuccess={() => {
               setSelectedCase(null);
               onUpdate();
-            }} 
+            }}
           />
         )}
       </AnimatePresence>
@@ -1814,6 +2266,7 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
     docNumber: '',
     docState: '',
     returnDocNumber: '',
+    approvalDocNumber: '',
     taskState: '',
     lawyer: '',
     cc_licensePlate: '',
@@ -1822,19 +2275,13 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
     cc_damageAmount: '',
     op_ReferenceNumber: '',
     op_customerName: '',
-    op_OverdueBillStart: '',
-    op_overdueBillEnd: '',
-    op_amount: '',
-    fn_fineType: '',
-    fn_fineTypeName: '',
-    fn_ReferenceNumber: '',
-    fn_OverdueBillStart: '',
-    fn_OverdueBillEnd: '',
-    fn_amount: '',
+    op_details: [],
+    fn_customerName: '',
+    fn_details: [],
     fn_additionalFees: [],
     notes: '',
   });
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -1846,23 +2293,30 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
     try {
       const data = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
-        if (key === 'fn_additionalFees' && Array.isArray(value)) {
-          // Serialize array to JSON string
+        if (key === 'keptDocuments' || key === 'courtDocument' || key === 'courtDocuments') return;
+        if (Array.isArray(value)) {
           data.append(key, JSON.stringify(value));
         } else {
           data.append(key, value as string);
         }
       });
-      
+
       // Calculate and add total fine amount (base + additional fees)
       if (formData.taskType === 'fine') {
-        const baseFine = parseFloat(formData.fn_amount || '0') || 0;
+        const baseFineSum = (formData.fn_details || []).reduce((sum: number, d: any) => sum + (parseFloat(d.fn_amount) || 0), 0);
         const additionalSum = (formData.fn_additionalFees || []).reduce((sum: number, fee: any) => sum + (parseFloat(fee.amount) || 0), 0);
-        const totalAmount = baseFine + additionalSum;
+        const totalAmount = baseFineSum + additionalSum;
         data.append('fn_totalAmount', String(totalAmount));
       }
-      
-      if (file) data.append('courtDocument', file);
+
+      if (files && files.length > 0) {
+        files.forEach((f: any) => {
+          if (f.file) {
+            data.append("courtDocuments", f.file);
+            data.append("documentDescriptions", f.description || f.file.name);
+          }
+        });
+      }
 
       const response = await fetch('/api/cases', {
         method: 'POST',
@@ -1872,9 +2326,9 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
       if (response.ok) {
         setSubmitStatus('success');
         setFormData({
-          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], notes: '',
+          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', approvalDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], notes: '',
         });
-        setFile(null);
+        setFiles([]);
         onSuccess();
       } else {
         setSubmitStatus('error');
@@ -1895,12 +2349,12 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
       </div>
 
       <form onSubmit={handleSubmit}>
-        <CaseFormFields 
-          formData={formData} 
-          setFormData={setFormData} 
-          file={file} 
-          setFile={setFile} 
-          dropdowns={dropdowns} 
+        <CaseFormFields
+          formData={formData}
+          setFormData={setFormData}
+          files={files}
+          setFiles={setFiles}
+          dropdowns={dropdowns}
           isEditMode={false}
         />
 
@@ -1985,7 +2439,7 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
   const [dropdowns, setDropdowns] = useState<Dropdowns>({
-    source: [], docState: [], taskState: [], lawyer: [], fineType: []
+    source: [], docState: [], taskState: [], lawyer: [], fineType: [], uploadFileTypes: []
   });
 
   useEffect(() => {
@@ -1996,7 +2450,7 @@ function App() {
   const initLiff = async (liffId: string) => {
     try {
       console.log('Initializing LIFF with ID:', liffId);
-      
+
       // Dev bypass: ถ้า VITE_DEV_MODE=1 และมี ?bypass=1 ใน URL ให้ข้ามการ login
       const urlParams = new URLSearchParams(window.location.search);
       const isDevMode = (import.meta as any).env?.VITE_DEV_MODE === '1';
@@ -2007,20 +2461,20 @@ function App() {
         setAuthStatus('approved');
         return;
       }
-      
+
       await liff.init({ liffId });
       console.log('LIFF initialized, isLoggedIn:', liff.isLoggedIn());
-      
+
       if (!liff.isLoggedIn()) {
         console.log('Not logged in, redirecting to LINE login...');
         liff.login();
         return;
       }
-      
+
       console.log('Getting profile...');
       const profile = await liff.getProfile();
       console.log('Profile received:', profile);
-      
+
       console.log('Sending auth request to backend...');
       const res = await fetch('/api/auth/line', {
         method: 'POST',
@@ -2032,15 +2486,15 @@ function App() {
           statusMessage: profile.statusMessage || '',
         }),
       });
-      
+
       if (!res.ok) {
         console.error('Backend auth failed:', res.status, await res.text());
         throw new Error('Backend auth failed');
       }
-      
+
       const data = await res.json();
       console.log('Backend auth response:', data);
-      
+
       const user: AuthUser = {
         userId: profile.userId,
         displayName: profile.displayName,
@@ -2064,31 +2518,35 @@ function App() {
 
   const fetchData = async () => {
     try {
-      const [source, docState, taskState, lawyer, fineType, casesData] = await Promise.all([
+      const [source, docState, taskState, lawyer, fineType, uploadFileTypes, casesData] = await Promise.all([
         fetch('/api/sheets/source').then(res => res.json()),
         fetch('/api/sheets/doc_state').then(res => res.json()),
         fetch('/api/sheets/task_state').then(res => res.json()),
         fetch('/api/sheets/lawyer').then(res => res.json()),
         fetch('/api/sheets/fine_type').then(res => res.json()),
+        fetch('/api/sheets/upload_file_types').then(res => res.json()),
         fetch('/api/cases').then(res => res.json())
       ]);
       // Normalize responses into DropdownOption[] (id,label)
-      const toDropdown = (data: any): DropdownOption[] => {
+      const toDropdown = (data: any, customKey?: string): DropdownOption[] => {
         if (!data) return [];
-        // if wrapper object with options/normalized/rows
-        if (data.options && Array.isArray(data.options)) return toDropdown(data.options);
-        if (data.normalized && Array.isArray(data.normalized)) return toDropdown(data.normalized);
-        if (data.rows && Array.isArray(data.rows)) {
-          const rows = data.rows;
-          if (rows.length === 0) return [];
-          const keys = Object.keys(rows[0]);
-          if (keys.length >= 2) return rows.map(r => ({ id: String(r[keys[0]] ?? ''), label: String(r[keys[1]] ?? '') }));
-          return rows.map((r: any, i: number) => ({ id: String(i + 1), label: String(r[keys[0]] ?? '') }));
-        }
+        // If we want a specific column, use 'rows' as it contains the raw data with all columns
+        if (customKey && data.rows && Array.isArray(data.rows)) return toDropdown(data.rows, customKey);
+        
+        // If wrapper object with options/normalized/rows
+        if (data.options && Array.isArray(data.options)) return toDropdown(data.options, customKey);
+        if (data.normalized && Array.isArray(data.normalized)) return toDropdown(data.normalized, customKey);
+        if (data.rows && Array.isArray(data.rows)) return toDropdown(data.rows, customKey);
         if (Array.isArray(data)) {
           if (data.length === 0) return [];
           const first = data[0];
           if (first && typeof first === 'object') {
+            if (customKey && customKey in first) {
+              return data.map((o: any, i: number) => ({ 
+                id: customKey === 'source' ? String(i + 1) : String(o['id'] || o[customKey] || (i + 1)), 
+                label: String(o[customKey] ?? '') 
+              }));
+            }
             if ('id' in first && 'label' in first) return data;
             const keys = Object.keys(first);
             if (keys.length === 1) return data.map((o: any, i: number) => ({ id: String(i + 1), label: String(o[keys[0]] ?? '') }));
@@ -2100,7 +2558,7 @@ function App() {
         return [];
       };
 
-      setDropdowns({ source: toDropdown(source), docState: toDropdown(docState), taskState: toDropdown(taskState), lawyer: toDropdown(lawyer), fineType: toDropdown(fineType) });
+      setDropdowns({ source: toDropdown(source, 'source'), docState: toDropdown(docState), taskState: toDropdown(taskState), lawyer: toDropdown(lawyer), fineType: toDropdown(fineType), uploadFileTypes: toDropdown(uploadFileTypes) });
       setCases(casesData);
     } catch (error) {
       console.error("Failed to fetch data", error);
@@ -2177,156 +2635,153 @@ function App() {
 
   return (
     <AuthContext.Provider value={authUser}>
-    <div className="min-h-screen bg-[#F2F2F7] flex font-sans selection:bg-blue-200" style={{ fontFamily: "'Sarabun', sans-serif" }}>
-      {/* Sidebar (Desktop) */}
-      <aside 
-        className={`hidden md:flex flex-col bg-white/80 backdrop-blur-3xl border-r border-white/40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 ease-in-out fixed top-0 left-0 h-screen ${
-          isSidebarCollapsed ? 'w-24' : 'w-72'
-        }`}
-      >
-        <div className={`p-8 flex items-center ${isSidebarCollapsed ? 'justify-center px-4' : 'justify-between'}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
-              <FileText className="w-6 h-6 text-white" />
-            </div>
-            {!isSidebarCollapsed && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h1 className="text-xl font-bold text-slate-800 tracking-tight whitespace-nowrap">ระบบจัดการคดี</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Legal Case Management</p>
-              </motion.div>
-            )}
-          </div>
-        </div>
-        
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          {navItems.map(item => (
-            <button 
-              key={item.id}
-              onClick={() => setCurrentView(item.id as any)}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-start'} gap-3 px-4 py-3.5 rounded-2xl font-medium transition-all group ${
-                currentView === item.id 
-                  ? 'bg-blue-50 text-blue-700 shadow-sm' 
-                  : 'text-slate-600 hover:bg-slate-100/80'
-              }`}
-              title={isSidebarCollapsed ? item.label : undefined}
-            >
-              <item.icon className={`w-5 h-5 shrink-0 ${currentView === item.id ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} /> 
-              {!isSidebarCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-slate-200/50">
-          {/* User profile + collapse + logout */}
-          {!isSidebarCollapsed && authUser ? (
-            <div className="flex items-center gap-2 px-2 py-2">
-              {authUser.pictureUrl
-                ? <img src={authUser.pictureUrl} alt="profile" className="w-8 h-8 rounded-full shrink-0" />
-                : <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><User className="w-4 h-4 text-indigo-500" /></div>
-              }
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 truncate">{authUser.displayName}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                  <p className="text-xs text-emerald-600">อนุมัติแล้ว</p>
-                </div>
+      <div className="min-h-screen bg-[#F2F2F7] flex font-sans selection:bg-blue-200" style={{ fontFamily: "'Sarabun', sans-serif" }}>
+        {/* Sidebar (Desktop) */}
+        <aside
+          className={`hidden md:flex flex-col bg-white/80 backdrop-blur-3xl border-r border-white/40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 ease-in-out fixed top-0 left-0 h-screen ${isSidebarCollapsed ? 'w-24' : 'w-72'
+            }`}
+        >
+          <div className={`p-8 flex items-center ${isSidebarCollapsed ? 'justify-center px-4' : 'justify-between'}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
+                <FileText className="w-6 h-6 text-white" />
               </div>
-              <button
-                onClick={() => { try { liff.logout(); } catch {} window.location.reload(); }}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0"
-                title="ออกจากระบบ"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              {!isSidebarCollapsed && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <h1 className="text-xl font-bold text-slate-800 tracking-tight whitespace-nowrap">ระบบจัดการคดี</h1>
+                  <p className="text-xs text-slate-500 mt-0.5">Legal Case Management</p>
+                </motion.div>
+              )}
             </div>
-          ) : null}
-          <div className="flex justify-center mt-2">
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-            </button>
-            {isSidebarCollapsed && (
+          </div>
+
+          <nav className="flex-1 px-4 space-y-2 mt-4">
+            {navItems.map(item => (
               <button
-                onClick={() => { try { liff.logout(); } catch {} window.location.reload(); }}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-                title="ออกจากระบบ"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 z-50 flex items-center justify-between px-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-            <FileText className="w-4 h-4 text-white" />
-          </div>
-          <h1 className="text-lg font-bold text-slate-800">ระบบจัดการคดี</h1>
-        </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600">
-          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
-
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden fixed inset-0 z-40 bg-white/95 backdrop-blur-3xl pt-20 px-4"
-          >
-            <nav className="space-y-2">
-              {navItems.map(item => (
-                <button 
-                  key={item.id}
-                  onClick={() => { setCurrentView(item.id as any); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl font-medium transition-all ${
-                    currentView === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600'
+                key={item.id}
+                onClick={() => setCurrentView(item.id as any)}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-start'} gap-3 px-4 py-3.5 rounded-2xl font-medium transition-all group ${currentView === item.id
+                    ? 'bg-blue-50 text-blue-700 shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100/80'
                   }`}
+                title={isSidebarCollapsed ? item.label : undefined}
+              >
+                <item.icon className={`w-5 h-5 shrink-0 ${currentView === item.id ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                {!isSidebarCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
+              </button>
+            ))}
+          </nav>
+
+          <div className="p-4 border-t border-slate-200/50">
+            {/* User profile + collapse + logout */}
+            {!isSidebarCollapsed && authUser ? (
+              <div className="flex items-center gap-2 px-2 py-2">
+                {authUser.pictureUrl
+                  ? <img src={authUser.pictureUrl} alt="profile" className="w-8 h-8 rounded-full shrink-0" />
+                  : <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><User className="w-4 h-4 text-indigo-500" /></div>
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-700 truncate">{authUser.displayName}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                    <p className="text-xs text-emerald-600">อนุมัติแล้ว</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { try { liff.logout(); } catch { } window.location.reload(); }}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0"
+                  title="ออกจากระบบ"
                 >
-                  <item.icon className="w-5 h-5" /> {item.label}
+                  <LogOut className="w-4 h-4" />
                 </button>
-              ))}
-            </nav>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </div>
+            ) : null}
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+              </button>
+              {isSidebarCollapsed && (
+                <button
+                  onClick={() => { try { liff.logout(); } catch { } window.location.reload(); }}
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                  title="ออกจากระบบ"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </aside>
 
-      {/* Main Content */}
-      <main className={`flex-1 overflow-y-auto pt-16 md:pt-0 relative transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-24' : 'md:ml-72'}`}>
-        {/* Background decorative elements */}
-        <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-100/40 via-purple-100/40 to-emerald-100/40 pointer-events-none" />
-        <div className="absolute top-20 right-20 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 p-4 md:p-8 lg:p-12 mx-auto">
-        
-     
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentView}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {currentView === 'stats' && <StatsDashboard cases={cases} />}
-              {currentView === 'list' && <ListView cases={cases} dropdowns={dropdowns} onUpdate={fetchData} />}
-              {currentView === 'create' && <CreateForm dropdowns={dropdowns} onSuccess={fetchData} />}
-              {currentView === 'archived' && <ArchivedView onUpdate={fetchData} />}
-            </motion.div>
-          </AnimatePresence>
+        {/* Mobile Header */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 z-50 flex items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+              <FileText className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-lg font-bold text-slate-800">ระบบจัดการคดี</h1>
+          </div>
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600">
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-      </main>
-    </div>
+
+        {/* Mobile Menu Overlay */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="md:hidden fixed inset-0 z-40 bg-white/95 backdrop-blur-3xl pt-20 px-4"
+            >
+              <nav className="space-y-2">
+                {navItems.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => { setCurrentView(item.id as any); setIsMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl font-medium transition-all ${currentView === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600'
+                      }`}
+                  >
+                    <item.icon className="w-5 h-5" /> {item.label}
+                  </button>
+                ))}
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Content */}
+        <main className={`flex-1 overflow-y-auto pt-16 md:pt-0 relative transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-24' : 'md:ml-72'}`}>
+          {/* Background decorative elements */}
+          <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-100/40 via-purple-100/40 to-emerald-100/40 pointer-events-none" />
+          <div className="absolute top-20 right-20 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 p-4 md:p-8 lg:p-12 mx-auto">
+
+
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentView}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {currentView === 'stats' && <StatsDashboard cases={cases} />}
+                {currentView === 'list' && <ListView cases={cases} dropdowns={dropdowns} onUpdate={fetchData} />}
+                {currentView === 'create' && <CreateForm dropdowns={dropdowns} onSuccess={fetchData} />}
+                {currentView === 'archived' && <ArchivedView onUpdate={fetchData} />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
     </AuthContext.Provider>
   );
 }

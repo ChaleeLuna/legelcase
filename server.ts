@@ -26,9 +26,8 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const SUPABASE_BUCKET = 'legalcase-documents';
 const WORD_TEMPLATE_DIR = path.join(process.cwd(), "templates", "word");
 const LEGACY_WORD_TEMPLATE_DIR = path.join(process.cwd(), "templates");
-const CASE_DEFAULT_HEADERS = ['id','taskType','receiveDate','docNumber','source','sourceName','docState','docStateName','taskState','taskStateName','lawyer','lawyerName','returnDocNumber','cc_licensePlate','cc_driverName','cc_ReferenceNumber','cc_damageAmount','op_ReferenceNumber','op_customerName','fn_customerName','op_OverdueBillStart','op_overdueBillEnd','op_amount','fn_fineType','fn_fineTypeName','fn_ReferenceNumber','fn_OverdueBillStart','fn_OverdueBillEnd','fn_amount','fn_additionalFees','fn_totalAmount','notes','isArchived','isFinish','courtDocument'];
-const THAI_MONTHS_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const CASE_DEFAULT_HEADERS = ['id', 'taskType', 'receiveDate', 'docNumber', 'source', 'sourceName', 'docState', 'docStateName', 'taskState', 'taskStateName', 'lawyer', 'lawyerName', 'returnDocNumber', 'approvalDocNumber', 'cc_licensePlate', 'cc_driverName', 'cc_ReferenceNumber', 'cc_damageAmount', 'op_ReferenceNumber', 'op_customerName', 'op_OverdueBillStart', 'op_overdueBillEnd', 'op_amount', 'op_details', 'fn_customerName', 'fn_fineType', 'fn_fineTypeName', 'fn_ReferenceNumber', 'fn_OverdueBillStart', 'fn_OverdueBillEnd', 'fn_amount', 'fn_additionalFees', 'fn_details', 'fn_totalAmount', 'notes', 'isArchived', 'isFinish', 'courtDocument'];
+
 const createDocxReport =
   typeof docxTemplates.createReport === "function"
     ? docxTemplates.createReport
@@ -38,125 +37,7 @@ const createDocxReport =
         ? docxTemplates
         : null;
 
-function generateUniqueFilename(originalName: string, taskType: string, docNumber: string): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const date = `${year}-${month}-${day}`;
-    
-    // Generate a random 6-character string
-    const uniqueCode = Math.random().toString(36).substring(2, 8);
-    
-    const extension = path.extname(originalName);
-    const sanitizedTaskType = String(taskType || 'task').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const sanitizedDocNumber = String(docNumber || 'doc').replace(/[^a-zA-Z0-9._-]/g, '_');
-
-    const newName = `${sanitizedTaskType}-${sanitizedDocNumber}-${date}-${uniqueCode}${extension}`;
-    
-    return `${year}/${newName}`;
-}
-
-function parseSupportedDate(value: unknown): Date | null {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  const dateOnlyMatch = trimmed.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
-  if (dateOnlyMatch) {
-    const [, year, month, day] = dateOnlyMatch;
-    const parsed = new Date(Number(year), Number(month) - 1, Number(day));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const isoMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
-  if (isoMatch) {
-    const [year, month, day] = isoMatch[1].split("-").map(Number);
-    const parsed = new Date(year, month - 1, day);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  return null;
-}
-
-function formatThaiBuddhistDateParts(date: Date) {
-  const day = date.getDate();
-  const monthIndex = date.getMonth();
-  const year = date.getFullYear() + 543;
-
-  return {
-    thdate_full: `${day} ${THAI_MONTHS_FULL[monthIndex]} ${year}`,
-    thdate_short: `${day} ${THAI_MONTHS_SHORT[monthIndex]} ${year}`,
-    thmonth_full: `${THAI_MONTHS_FULL[monthIndex]} ${year}`,
-    thmonth_short: `${THAI_MONTHS_SHORT[monthIndex]} ${year}`,
-  };
-}
-
-function normalizeTemplateValue(value: any): any {
-  if (value == null) return "";
-  if (Array.isArray(value)) return value.map(normalizeTemplateValue);
-  if (typeof value === "object") {
-    const normalized: Record<string, any> = {};
-    Object.entries(value).forEach(([key, innerValue]) => {
-      normalized[key] = normalizeTemplateValue(innerValue);
-    });
-    return normalized;
-  }
-  return value;
-}
-
-function buildFineFeeItems(source: Record<string, any>) {
-  const additionalFees = Array.isArray(source.fn_additionalFees) ? source.fn_additionalFees : [];
-  const feeItems = additionalFees.map((fee: any, index: number) => ({
-    index: index + 1,
-    name: String(fee?.name ?? "").trim(),
-    amount: String(fee?.amount ?? "").trim(),
-  }));
-
-  const fineAmount = String(source.fn_amount ?? "").trim();
-  if (fineAmount) {
-    feeItems.push({
-      index: feeItems.length + 1,
-      name: "ค่าละเมิด",
-      amount: fineAmount,
-    });
-  }
-
-  return feeItems;
-}
-
-function withThaiDateVariants(source: Record<string, any>) {
-  const result: Record<string, any> = {};
-
-  Object.entries(source).forEach(([key, value]) => {
-    result[key] = normalizeTemplateValue(value);
-
-    const parsedDate = parseSupportedDate(value);
-    if (parsedDate) {
-      const formatted = formatThaiBuddhistDateParts(parsedDate);
-      result[`${key}_thdate_full`] = formatted.thdate_full;
-      result[`${key}_thdate_short`] = formatted.thdate_short;
-      result[`${key}_thmonth_full`] = formatted.thmonth_full;
-      result[`${key}_thmonth_short`] = formatted.thmonth_short;
-    }
-  });
-
-  const fineFeeItems = buildFineFeeItems(source);
-  result.fn_feeItems = fineFeeItems;
-  result.fn_feeItemsText = fineFeeItems
-    .map((item) => `${item.index}. ${item.name} รวมเป็นเงิน ${item.amount} บาท`)
-    .join("\n");
-  result.fn_feeItemsBlock = result.fn_feeItemsText;
-  result.fn_feeItemsParagraphs = fineFeeItems.map((item) => ({
-    text: `${item.index}. ${item.name} รวมเป็นเงิน ${item.amount} บาท`,
-  }));
-
-  return result;
-}
+import { generateUniqueFilename, withThaiDateVariants } from './serverUtils.js';
 
 async function resolveWordTemplatePath(taskType: string) {
   const filename = `${String(taskType || "task").trim()}.docx`;
@@ -178,9 +59,51 @@ async function resolveWordTemplatePath(taskType: string) {
 }
 
 function buildWordDownloadName(caseData: Record<string, any>) {
-  const safeTaskType = String(caseData.taskType || "task").replace(/[^a-zA-Z0-9._-]/g, "_");
-  const safeDocNumber = String(caseData.docNumber || caseData.id || "case").replace(/[^a-zA-Z0-9._-]/g, "_");
-  return `${safeTaskType}-${safeDocNumber}.docx`;
+  let thaiTaskType = caseData.taskType || "task";
+  if (thaiTaskType === 'car_crash') thaiTaskType = 'รถยนต์ชนเสา';
+  else if (thaiTaskType === 'overdue_payment') thaiTaskType = 'ค่าไฟฟ้าค้างชำระ';
+  else if (thaiTaskType === 'fine') thaiTaskType = 'ค่าไฟฟ้าปรับปรุง';
+
+  let customerName = '';
+  let caNumbers: string[] = [];
+
+  if (caseData.taskType === 'car_crash') {
+    customerName = String(caseData.cc_driverName || caseData.driverName || '').trim();
+    if (caseData.cc_ReferenceNumber) caNumbers.push(String(caseData.cc_ReferenceNumber).trim());
+    if (caseData.referenceNumber) caNumbers.push(String(caseData.referenceNumber).trim());
+  } else if (caseData.taskType === 'overdue_payment') {
+    customerName = String(caseData.op_customerName || caseData.driverName || '').trim();
+    if (Array.isArray(caseData.op_details) && caseData.op_details.length > 0) {
+      caNumbers = caseData.op_details.map((d: any) => String(d.op_ReferenceNumber || '').trim()).filter(Boolean);
+    } else {
+      if (caseData.op_ReferenceNumber) caNumbers.push(String(caseData.op_ReferenceNumber).trim());
+      if (caseData.referenceNumber) caNumbers.push(String(caseData.referenceNumber).trim());
+    }
+  } else if (caseData.taskType === 'fine') {
+    customerName = String(caseData.fn_customerName || caseData.driverName || '').trim();
+    if (Array.isArray(caseData.fn_details) && caseData.fn_details.length > 0) {
+      caNumbers = caseData.fn_details.map((d: any) => String(d.fn_ReferenceNumber || '').trim()).filter(Boolean);
+    } else {
+      if (caseData.fn_ReferenceNumber) caNumbers.push(String(caseData.fn_ReferenceNumber).trim());
+      if (caseData.referenceNumber) caNumbers.push(String(caseData.referenceNumber).trim());
+    }
+  } else {
+    customerName = String(caseData.docNumber || caseData.id || "case").trim();
+  }
+
+  caNumbers = [...new Set(caNumbers)];
+
+  let filename = `ขออนุมัติฟ้อง${thaiTaskType}`;
+  if (customerName) {
+    const safeCustomer = customerName.replace(/\s+/g, '_');
+    filename += `-${safeCustomer}`;
+  }
+  if (caNumbers.length > 0) {
+    filename += `-${caNumbers.join('-')}`;
+  }
+  filename += `.docx`;
+
+  return encodeURIComponent(filename);
 }
 
 // Upload a file buffer to Supabase Storage and return the public URL
@@ -359,7 +282,7 @@ async function startServer() {
         } else if (headers.length === 1) {
           normalized = values.slice(1).map((row, i) => ({ id: `${i + 1}`, label: row[0] ?? "" }));
         }
-     
+
         return res.json({ rows, options: normalized, normalized });
       } catch (err) {
         console.error("Service account Sheets fetch failed, falling back:", err);
@@ -488,9 +411,17 @@ async function startServer() {
         const resp = await sheets.spreadsheets.values.get({ spreadsheetId: GOOGLE_SHEET_ID!, range });
         const values: string[][] = resp.data.values || [];
         if (values.length === 0) return [];
-        const headers = values[0];
+        const headers = (values[0] || []).map(h => String(h || "").trim().toLowerCase());
+        const sourceIdx = headers.indexOf('source');
         if (headers.length >= 2) {
-          return values.slice(1).map((row, i) => ({ id: String(row[0] ?? `${i + 1}`), label: String(row[1] ?? row[0] ?? "") }));
+          return values.slice(1).map((row, i) => {
+            // For 'source' sheet, we use 1-based index as ID
+            const id = (sheetName === 'source') ? String(i + 1) : String(row[0] ?? `${i + 1}`);
+            // For 'source' sheet, we always use the 'source' column as the label
+            const labelIdx = (sheetName === 'source' && sourceIdx !== -1) ? sourceIdx : 1;
+            const label = String(row[labelIdx] ?? row[0] ?? id);
+            return { id, label };
+          });
         }
         return values.slice(1).map((row, i) => ({ id: String(i + 1), label: String(row[0] ?? "") }));
       } catch (err) {
@@ -507,9 +438,15 @@ async function startServer() {
         const json = await resp.json();
         const values: string[][] = json.values || [];
         if (values.length === 0) return [];
-        const headers = values[0];
+        const headers = (values[0] || []).map(h => String(h || "").trim().toLowerCase());
+        const sourceIdx = headers.indexOf('source');
         if (headers.length >= 2) {
-          return values.slice(1).map((row, i) => ({ id: String(row[0] ?? `${i + 1}`), label: String(row[1] ?? row[0] ?? "") }));
+          return values.slice(1).map((row, i) => {
+            const id = (sheetName === 'source') ? String(i + 1) : String(row[0] ?? `${i + 1}`);
+            const labelIdx = (sheetName === 'source' && sourceIdx !== -1) ? sourceIdx : 1;
+            const label = String(row[labelIdx] ?? row[0] ?? id);
+            return { id, label };
+          });
         }
         return values.slice(1).map((row, i) => ({ id: String(i + 1), label: String(row[0] ?? "") }));
       } catch (err) {
@@ -543,7 +480,7 @@ async function startServer() {
         if (key.toLowerCase() === "isarchived" || key.toLowerCase() === "archived" || key.toLowerCase() === "isfinish") {
           const v = String(raw).trim().toLowerCase();
           obj[key] = v === "true" || v === "1" || v === "yes";
-        } else if (key === "fn_additionalFees") {
+        } else if (key === "fn_additionalFees" || key === "op_details" || key === "fn_details") {
           // Parse JSON string back to array
           try {
             obj[key] = JSON.parse(String(raw));
@@ -600,14 +537,46 @@ async function startServer() {
 
       const template = await fs.readFile(templatePath);
       const templateData = withThaiDateVariants(caseData);
+
+      // Look up source in Google Sheet to attach poa_cc and poa_fn
+      try {
+        const sourcesRow = await readSheetAsObjects("source");
+        const lookupSourceName = String(caseData.sourceName || "").trim();
+        const matchedSource = sourcesRow.find((s: any) => {
+          const sName = String(s.source || "").trim();
+          return sName.toLowerCase() === lookupSourceName.toLowerCase();
+        });
+
+        if (matchedSource) {
+          templateData.poa_cc = matchedSource.poa_cc || "";
+          templateData.poa_fn = matchedSource.poa_fn || "";
+        } else {
+          templateData.poa_cc = "-";
+          templateData.poa_fn = "-";
+        }
+      } catch (err) {
+        console.error("Failed to load source sheet for poa mappings", err);
+        templateData.poa_cc = "-";
+        templateData.poa_fn = "-";
+      }
+
       const templateExtras = {
         fn_feeItemsBlock: templateData.fn_feeItemsBlock,
         fn_feeItemsText: templateData.fn_feeItemsText,
         fn_feeItemsParagraphs: templateData.fn_feeItemsParagraphs,
+        poa_cc: templateData.poa_cc,
+        poa_fn: templateData.poa_fn,
       };
       if (typeof createDocxReport !== "function") {
         throw new Error("docx-templates createReport is unavailable");
       }
+      console.log('Final Template Data for Word:', {
+        source: templateData.source,
+        sourceName: templateData.sourceName,
+        poa_cc: templateData.poa_cc,
+        poa_fn: templateData.poa_fn
+      });
+      console.log("Template Data :", templateData)
       const report = await createDocxReport({
         template,
         data: templateData,
@@ -626,10 +595,10 @@ async function startServer() {
     }
   });
 
-  app.post("/api/cases", upload.single("courtDocument"), async (req, res) => {
+  app.post("/api/cases", upload.array("courtDocuments"), async (req, res) => {
     console.log("Received case data:", req.body);
-    if (req.file) {
-      console.log("Received file:", req.file.originalname);
+    if (req.files) {
+      console.log("Received files:", (req.files as any[]).map(f => f.originalname));
     }
 
     try {
@@ -648,12 +617,26 @@ async function startServer() {
         isFinish: false,
       };
 
-      // Upload court document to Supabase if provided
-      if (req.file) {
+      // Upload court documents to Supabase if provided
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
         const { taskType, docNumber } = newCase;
-        const filePath = generateUniqueFilename(req.file.originalname, taskType, docNumber);
-        const supabaseLink = await uploadFileToSupabase(req.file.buffer, filePath, req.file.mimetype);
-        if (supabaseLink) newCase.courtDocument = supabaseLink;
+        const uploadPromises = req.files.map(async (file, index) => {
+          let desc = '';
+          if (req.body.documentDescriptions) {
+            const descriptions = Array.isArray(req.body.documentDescriptions)
+              ? req.body.documentDescriptions
+              : [req.body.documentDescriptions];
+            desc = descriptions[index] || '';
+          }
+          const filePath = generateUniqueFilename(file.originalname, taskType, docNumber, desc);
+          const url = await uploadFileToSupabase(file.buffer, filePath, file.mimetype);
+          return url ? { name: desc || file.originalname, url } : null;
+        });
+        const supabaseLinks = await Promise.all(uploadPromises);
+        const validLinks = supabaseLinks.filter(Boolean);
+        if (validLinks.length > 0) {
+          newCase.courtDocument = JSON.stringify(validLinks);
+        }
       }
 
       // Parse fn_additionalFees JSON string back to array
@@ -666,21 +649,21 @@ async function startServer() {
       }
 
       // Resolve dropdown ids -> labels
-      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions, customerOptions] = await Promise.all([
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions] = await Promise.all([
         getSheetOptions('source'),
         getSheetOptions('doc_state'),
         getSheetOptions('task_state'),
         getSheetOptions('lawyer'),
         getSheetOptions('fine_type'),
-        getSheetOptions('customer'),
       ]);
 
-      newCase.sourceName = (sourceOptions.find((o:any) => o.id === newCase.source) || {}).label || newCase.sourceName || '';
-      newCase.docStateName = (docStateOptions.find((o:any) => o.id === newCase.docState) || {}).label || newCase.docStateName || '';
-      newCase.taskStateName = (taskStateOptions.find((o:any) => o.id === newCase.taskState) || {}).label || newCase.taskStateName || '';
-      newCase.lawyerName = (lawyerOptions.find((o:any) => o.id === newCase.lawyer) || {}).label || newCase.lawyerName || '';
-      newCase.fn_fineTypeName = (fineTypeOptions.find((o:any) => o.id === newCase.fn_fineType) || {}).label || newCase.fn_fineTypeName || '';
-      newCase.fn_customerName = (customerOptions.find((o:any) => o.id === newCase.fn_customer) || {}).label || newCase.fn_customerName || '';
+      newCase.sourceName = (sourceOptions.find((o: any) => o.id === newCase.source) || {}).label || newCase.sourceName || '';
+      newCase.docStateName = (docStateOptions.find((o: any) => o.id === newCase.docState) || {}).label || newCase.docStateName || '';
+      newCase.taskStateName = (taskStateOptions.find((o: any) => o.id === newCase.taskState) || {}).label || newCase.taskStateName || '';
+      newCase.lawyerName = (lawyerOptions.find((o: any) => o.id === newCase.lawyer) || {}).label || newCase.lawyerName || '';
+      newCase.fn_fineTypeName = (fineTypeOptions.find((o: any) => o.id === newCase.fn_fineType) || {}).label || newCase.fn_fineTypeName || '';
+      // fn_customerName is direct string in UI
+
 
       console.log('Resolved labels before append:', {
         source: newCase.sourceName,
@@ -696,13 +679,19 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       console.log('Using headers for append:', effectiveHeaders);
-      
+
       // Convert fn_additionalFees array to JSON string for sheet storage
       const rowData = { ...newCase };
       if (Array.isArray(rowData.fn_additionalFees)) {
         rowData.fn_additionalFees = JSON.stringify(rowData.fn_additionalFees);
       }
-      
+      if (Array.isArray(rowData.op_details)) {
+        rowData.op_details = JSON.stringify(rowData.op_details);
+      }
+      if (Array.isArray(rowData.fn_details)) {
+        rowData.fn_details = JSON.stringify(rowData.fn_details);
+      }
+
       const row = effectiveHeaders.map(h => rowData[h] ?? '');
       console.log('Row to append:', row);
 
@@ -736,10 +725,10 @@ async function startServer() {
     }
   });
 
-  app.put("/api/cases/:id", upload.single("courtDocument"), async (req, res) => {
+  app.put("/api/cases/:id", upload.array("courtDocuments"), async (req, res) => {
     console.log(`Updating case ${req.params.id}:`, req.body);
-    if (req.file) {
-      console.log("Received file update:", req.file.originalname);
+    if (req.files) {
+      console.log("Received file update:", (req.files as any[]).map(f => f.originalname));
     }
 
     try {
@@ -753,12 +742,58 @@ async function startServer() {
       }
 
       // Upload court document to Supabase if a new file is provided
-      if (req.file) {
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
         const taskType = updateData.taskType || existing.taskType;
         const docNumber = updateData.docNumber || existing.docNumber;
-        const filePath = generateUniqueFilename(req.file.originalname, taskType, docNumber);
-        const supabaseLink = await uploadFileToSupabase(req.file.buffer, filePath, req.file.mimetype);
-        if (supabaseLink) updateData.courtDocument = supabaseLink;
+        const uploadPromises = req.files.map(async (file, index) => {
+          let desc = '';
+          if (req.body.documentDescriptions) {
+            const descriptions = Array.isArray(req.body.documentDescriptions)
+              ? req.body.documentDescriptions
+              : [req.body.documentDescriptions];
+            desc = descriptions[index] || '';
+          }
+          const filePath = generateUniqueFilename(file.originalname, taskType, docNumber, desc);
+          const url = await uploadFileToSupabase(file.buffer, filePath, file.mimetype);
+          return url ? { name: desc || file.originalname, url } : null;
+        });
+        const supabaseLinks = await Promise.all(uploadPromises);
+        const validLinks = supabaseLinks.filter(Boolean);
+
+        let existingLinks: any[] = [];
+        if (updateData.keptDocuments) {
+          try { existingLinks = JSON.parse(updateData.keptDocuments); } catch { }
+        } else if (existing.courtDocument) {
+          try {
+            const parsed = JSON.parse(existing.courtDocument);
+            existingLinks = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            const links = existing.courtDocument.split(',').filter(Boolean);
+            existingLinks = links.map((url: string) => {
+              let name = 'เอกสารแนบ';
+              try {
+                const filename = decodeURIComponent(url.split('/').pop() || '');
+                const match = filename.match(/^(.*?)-[a-z0-9]{12}(\.[^.]+)$/i);
+                if (match && match[1]) name = match[1];
+                else {
+                  const basic = filename.replace(/\.[^/.]+$/, "");
+                  name = basic || 'เอกสารแนบ';
+                }
+              } catch { }
+              return { name, url };
+            });
+          }
+        }
+
+        if (validLinks.length > 0 || existingLinks.length > 0) {
+          updateData.courtDocument = JSON.stringify([...existingLinks, ...validLinks]);
+        } else {
+          updateData.courtDocument = '';
+        }
+      } else if (updateData.keptDocuments) {
+        let kept = [];
+        try { kept = JSON.parse(updateData.keptDocuments); } catch { }
+        updateData.courtDocument = kept.length > 0 ? JSON.stringify(kept) : '';
       }
 
       // Parse fn_additionalFees JSON string back to array
@@ -771,32 +806,36 @@ async function startServer() {
       }
 
       // resolve dropdown labels
-      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions, customerOptions] = await Promise.all([
+      const [sourceOptions, docStateOptions, taskStateOptions, lawyerOptions, fineTypeOptions] = await Promise.all([
         getSheetOptions('source'),
         getSheetOptions('doc_state'),
         getSheetOptions('task_state'),
         getSheetOptions('lawyer'),
         getSheetOptions('fine_type'),
-        getSheetOptions('customer'),
       ]);
-      if (updateData.source) updateData.sourceName = (sourceOptions.find((o:any) => o.id === updateData.source) || {}).label || updateData.sourceName || '';
-      if (updateData.docState) updateData.docStateName = (docStateOptions.find((o:any) => o.id === updateData.docState) || {}).label || updateData.docStateName || '';
-      if (updateData.taskState) updateData.taskStateName = (taskStateOptions.find((o:any) => o.id === updateData.taskState) || {}).label || updateData.taskStateName || '';
-      if (updateData.lawyer) updateData.lawyerName = (lawyerOptions.find((o:any) => o.id === updateData.lawyer) || {}).label || updateData.lawyerName || '';
-      if (updateData.fn_fineType) updateData.fn_fineTypeName = (fineTypeOptions.find((o:any) => o.id === updateData.fn_fineType) || {}).label || updateData.fn_fineTypeName || '';
-      if (updateData.fn_customer) updateData.fn_customerName = (customerOptions.find((o:any) => o.id === updateData.fn_customer) || {}).label || updateData.fn_customerName || '';
-      if (updateData.fn_customer) updateData.fn_customerName = (customerOptions.find((o:any) => o.id === updateData.fn_customer) || {}).label || updateData.fn_customerName || '';
+      if (updateData.source) updateData.sourceName = (sourceOptions.find((o: any) => o.id === updateData.source) || {}).label || updateData.sourceName || '';
+      if (updateData.docState) updateData.docStateName = (docStateOptions.find((o: any) => o.id === updateData.docState) || {}).label || updateData.docStateName || '';
+      if (updateData.taskState) updateData.taskStateName = (taskStateOptions.find((o: any) => o.id === updateData.taskState) || {}).label || updateData.taskStateName || '';
+      if (updateData.lawyer) updateData.lawyerName = (lawyerOptions.find((o: any) => o.id === updateData.lawyer) || {}).label || updateData.lawyerName || '';
+      if (updateData.fn_fineType) updateData.fn_fineTypeName = (fineTypeOptions.find((o: any) => o.id === updateData.fn_fineType) || {}).label || updateData.fn_fineTypeName || '';
+
 
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       const updated = { ...existing, ...updateData };
-      
+
       // Convert fn_additionalFees array to JSON string for sheet storage
       if (Array.isArray(updated.fn_additionalFees)) {
         updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
       }
-      
+      if (Array.isArray(updated.op_details)) {
+        updated.op_details = JSON.stringify(updated.op_details);
+      }
+      if (Array.isArray(updated.fn_details)) {
+        updated.fn_details = JSON.stringify(updated.fn_details);
+      }
+
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
       const sheets = await getSheetsClient();
@@ -836,12 +875,18 @@ async function startServer() {
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
-      
+
       // Convert fn_additionalFees array to JSON string if present
       if (Array.isArray(updated.fn_additionalFees)) {
         updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
       }
-      
+      if (Array.isArray(updated.op_details)) {
+        updated.op_details = JSON.stringify(updated.op_details);
+      }
+      if (Array.isArray(updated.fn_details)) {
+        updated.fn_details = JSON.stringify(updated.fn_details);
+      }
+
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
       const sheets = await getSheetsClient();
@@ -883,12 +928,18 @@ async function startServer() {
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
-      
+
       // Convert fn_additionalFees array to JSON string if present
       if (Array.isArray(updated.fn_additionalFees)) {
         updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
       }
-      
+      if (Array.isArray(updated.op_details)) {
+        updated.op_details = JSON.stringify(updated.op_details);
+      }
+      if (Array.isArray(updated.fn_details)) {
+        updated.fn_details = JSON.stringify(updated.fn_details);
+      }
+
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
       const sheets = await getSheetsClient();
@@ -930,6 +981,12 @@ async function startServer() {
       if (Array.isArray(updated.fn_additionalFees)) {
         updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
       }
+      if (Array.isArray(updated.op_details)) {
+        updated.op_details = JSON.stringify(updated.op_details);
+      }
+      if (Array.isArray(updated.fn_details)) {
+        updated.fn_details = JSON.stringify(updated.fn_details);
+      }
 
       const row = effectiveHeaders.map(h => updated[h] ?? '');
 
@@ -965,25 +1022,25 @@ async function startServer() {
       if (!existing) {
         return res.status(404).json({ error: "Case not found" });
       }
-  
+
       const rowNum = existing.__rowNum;
-  
+
       const sheets = await getSheetsClient();
       if (sheets) {
         // To delete a row, we need the sheetId (not the sheet name)
         const spreadsheet = await sheets.spreadsheets.get({
           spreadsheetId: GOOGLE_SHEET_ID!,
         });
-  
+
         const sheet = spreadsheet.data.sheets?.find(
           (s) => s.properties?.title === "case"
         );
-  
+
         if (sheet?.properties?.sheetId === undefined) {
           return res.status(500).json({ error: "Could not find sheetId for 'case'" });
         }
         const sheetId = sheet.properties.sheetId;
-        
+
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId: GOOGLE_SHEET_ID!,
           requestBody: {
@@ -1001,7 +1058,7 @@ async function startServer() {
             ],
           },
         });
-        
+
         res.json({ success: true, message: "ลบข้อมูลสำเร็จ" });
       } else {
         res.status(500).json({ error: "Could not connect to Google Sheets to delete." });
