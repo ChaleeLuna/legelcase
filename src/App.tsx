@@ -680,7 +680,7 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                 type="button"
                 onClick={() => {
                   const newDetails = [...(formData.fn_details || [])];
-                  newDetails.push({ fn_fineType: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '' });
+                  newDetails.push({ fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '' });
                   setFormData({ ...formData, fn_details: newDetails });
                 }}
                 className="flex items-center gap-2 px-3 py-2 text-sm bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-xl transition-colors font-medium"
@@ -720,6 +720,7 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                         onChange={(val: string) => {
                           const newDetails = [...formData.fn_details];
                           newDetails[index].fn_fineType = val;
+                          newDetails[index].fn_fineTypeName = dropdowns.fineType.find((o: any) => o.id === val)?.label || '';
                           setFormData({ ...formData, fn_details: newDetails });
                         }}
                         placeholder="เลือกประเภทค่าปรับ..."
@@ -887,16 +888,26 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
 
   // Ensure fn_details is always an array
   const parseFnDetails = (val: any): any[] => {
-    if (Array.isArray(val)) return val;
-    if (typeof val === 'string') {
+    let details: any[] = [];
+    if (Array.isArray(val)) {
+      details = val;
+    } else if (typeof val === 'string') {
       try {
         const parsed = JSON.parse(val);
-        return Array.isArray(parsed) ? parsed : [];
+        details = Array.isArray(parsed) ? parsed : [];
       } catch {
-        return [];
+        details = [];
       }
     }
-    return [];
+    
+    // Auto-resolve fineType names if missing
+    return details.map(d => {
+      if (d.fn_fineType && !d.fn_fineTypeName) {
+        const found = dropdowns.fineType.find((o: any) => o.id === d.fn_fineType);
+        return { ...d, fn_fineTypeName: found ? found.label : '' };
+      }
+      return d;
+    });
   };
 
   // Ensure fn_additionalFees is always an array
@@ -957,6 +968,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
       if (details.length === 0 && (caseData.fn_ReferenceNumber || caseData.fn_amount || caseData.referenceNumber || caseData.amount)) {
         return [{
           fn_fineType: caseData.fn_fineType || "",
+          fn_fineTypeName: caseData.fn_fineTypeName || "",
           fn_ReferenceNumber: caseData.fn_ReferenceNumber || caseData.referenceNumber || "",
           fn_OverdueBillStart: caseData.fn_OverdueBillStart || caseData.overdueBillStart || "",
           fn_OverdueBillEnd: caseData.fn_OverdueBillEnd || caseData.overdueBillEnd || "",
@@ -2326,7 +2338,7 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
       if (response.ok) {
         setSubmitStatus('success');
         setFormData({
-          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', approvalDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], notes: '',
+          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', approvalDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], fn_details: [], notes: '',
         });
         setFiles([]);
         onSuccess();
