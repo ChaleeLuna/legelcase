@@ -48,7 +48,7 @@ export const parseCourtDocuments = (data: any) => {
     try {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) return parsed;
-    } catch {}
+    } catch { }
     // fallback comma separated
     return data.split(',').filter(Boolean).map((docUrl: string, idx: number) => {
       let displayName = `เอกสารที่ ${idx + 1}`;
@@ -57,10 +57,10 @@ export const parseCourtDocuments = (data: any) => {
         const match = filename.match(/^(.*?)-[a-z0-9]{12}(\.[^.]+)$/i);
         if (match && match[1]) displayName = match[1];
         else {
-           const basic = filename.replace(/\.[^/.]+$/, "");
-           if (basic) displayName = basic;
+          const basic = filename.replace(/\.[^/.]+$/, "");
+          if (basic) displayName = basic;
         }
-      } catch {}
+      } catch { }
       return { name: displayName, url: docUrl };
     });
   }
@@ -261,16 +261,16 @@ const CreatableAutocomplete = ({ options = [], value, onChange, placeholder, req
             className="absolute z-[100] w-full mt-1 bg-white/95 backdrop-blur-xl border border-slate-100 rounded-xl shadow-lg max-h-48 overflow-y-auto"
           >
             {filteredOptions.map((opt: any) => (
-               <div
-                  key={opt.id}
-                  className="px-4 py-2.5 cursor-pointer text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                  onClick={() => {
-                    onChange(opt.label);
-                    setIsOpen(false);
-                  }}
-               >
-                 {opt.label}
-               </div>
+              <div
+                key={opt.id}
+                className="px-4 py-2.5 cursor-pointer text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                onClick={() => {
+                  onChange(opt.label);
+                  setIsOpen(false);
+                }}
+              >
+                {opt.label}
+              </div>
             ))}
           </motion.div>
         )}
@@ -302,8 +302,8 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'car_crash' })}
                 className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'car_crash'
-                    ? 'border-blue-500 bg-blue-50/50 text-blue-700'
-                    : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                  ? 'border-blue-500 bg-blue-50/50 text-blue-700'
+                  : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <Car className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
@@ -314,8 +314,8 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'overdue_payment' })}
                 className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'overdue_payment'
-                    ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700'
-                    : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                  ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700'
+                  : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
@@ -326,8 +326,8 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'fine', fn_additionalFees: [] })}
                 className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'fine'
-                    ? 'border-amber-500 bg-amber-50/50 text-amber-700'
-                    : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                  ? 'border-amber-500 bg-amber-50/50 text-amber-700'
+                  : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <Gavel className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
@@ -404,7 +404,7 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium text-slate-700 ml-1">เอกสารจากศาล (อัปโหลดขึ้น Supabase Storage)</label>
             <div className="mt-1 flex flex-col gap-4">
-              
+
               {/* Existing (kept) files */}
               {formData.keptDocuments && formData.keptDocuments.length > 0 && (
                 <div className="space-y-2 px-6 pt-5 pb-6 border-2 border-slate-200 rounded-2xl bg-slate-50/50">
@@ -430,73 +430,73 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
               {/* Newly selected files */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                   <p className="text-sm font-medium text-slate-600">เอกสารใหม่ที่จะอัปโหลด:</p>
-                   <button
-                     type="button"
-                     onClick={() => setFiles([...(files || []), { id: crypto.randomUUID(), description: '', file: null }])}
-                     className="flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl transition-colors font-medium border border-blue-200/50"
-                   >
-                     <Plus className="w-4 h-4" /> เพิ่มเอกสาร
-                   </button>
+                  <p className="text-sm font-medium text-slate-600">เอกสารใหม่ที่จะอัปโหลด:</p>
+                  <button
+                    type="button"
+                    onClick={() => setFiles([...(files || []), { id: crypto.randomUUID(), description: '', file: null }])}
+                    className="flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl transition-colors font-medium border border-blue-200/50"
+                  >
+                    <Plus className="w-4 h-4" /> เพิ่มเอกสาร
+                  </button>
                 </div>
-                
+
                 {files && files.map((fObj: any, idx: number) => (
-                   <div key={fObj.id || idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 bg-white/50 border border-slate-200 rounded-2xl shadow-sm overflow-visible">
-                     <div className="sm:col-span-4 space-y-1">
-                        <label className="text-xs font-semibold text-slate-600 ml-1">ชื่อเอกสาร / คำอธิบาย <span className="text-red-500">*</span></label>
-                        <CreatableAutocomplete
-                          options={dropdowns?.uploadFileTypes || []}
-                          value={fObj.description}
-                          required={true}
-                          placeholder="เช่น หนังสือมอบอำนาจ"
-                          onChange={(val: string) => {
+                  <div key={fObj.id || idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 bg-white/50 border border-slate-200 rounded-2xl shadow-sm overflow-visible">
+                    <div className="sm:col-span-4 space-y-1">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">ชื่อเอกสาร / คำอธิบาย <span className="text-red-500">*</span></label>
+                      <CreatableAutocomplete
+                        options={dropdowns?.uploadFileTypes || []}
+                        value={fObj.description}
+                        required={true}
+                        placeholder="เช่น หนังสือมอบอำนาจ"
+                        onChange={(val: string) => {
+                          const newFiles = [...files];
+                          newFiles[idx].description = val;
+                          setFiles(newFiles);
+                        }}
+                      />
+                    </div>
+                    <div className="sm:col-span-7 space-y-1">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">ไฟล์แนบ <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          required
+                          onChange={(e) => {
                             const newFiles = [...files];
-                            newFiles[idx].description = val;
-                            setFiles(newFiles);
-                          }}
-                        />
-                     </div>
-                     <div className="sm:col-span-7 space-y-1">
-                        <label className="text-xs font-semibold text-slate-600 ml-1">ไฟล์แนบ <span className="text-red-500">*</span></label>
-                        <div className="relative">
-                          <input
-                            type="file"
-                            required
-                            onChange={(e) => {
-                              const newFiles = [...files];
-                              if (e.target.files && e.target.files.length > 0) {
-                                newFiles[idx].file = e.target.files[0];
-                                if (!newFiles[idx].description) {
-                                  newFiles[idx].description = e.target.files[0].name.split('.')[0];
-                                }
-                              } else {
-                                newFiles[idx].file = null;
+                            if (e.target.files && e.target.files.length > 0) {
+                              newFiles[idx].file = e.target.files[0];
+                              if (!newFiles[idx].description) {
+                                newFiles[idx].description = e.target.files[0].name.split('.')[0];
                               }
-                              setFiles(newFiles);
-                            }}
-                            className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all cursor-pointer"
-                          />
-                        </div>
-                     </div>
-                     <div className="sm:col-span-1 flex justify-end pb-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newFiles = [...files];
-                            newFiles.splice(idx, 1);
+                            } else {
+                              newFiles[idx].file = null;
+                            }
                             setFiles(newFiles);
                           }}
-                          className="p-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                     </div>
-                   </div>
+                          className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    <div className="sm:col-span-1 flex justify-end pb-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFiles = [...files];
+                          newFiles.splice(idx, 1);
+                          setFiles(newFiles);
+                        }}
+                        className="p-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 ))}
                 {(!files || files.length === 0) && (
-                   <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm bg-white/30">
-                     ยังไม่มีเอกสารใหม่ (กดปุ่มลอยด้านบนขวาเพื่อเพิ่ม)
-                   </div>
+                  <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm bg-white/30">
+                    ยังไม่มีเอกสารใหม่ (กดปุ่มลอยด้านบนขวาเพื่อเพิ่ม)
+                  </div>
                 )}
               </div>
             </div>
@@ -899,7 +899,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
         details = [];
       }
     }
-    
+
     // Auto-resolve fineType names if missing
     return details.map(d => {
       if (d.fn_fineType && !d.fn_fineTypeName) {
@@ -2232,8 +2232,8 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
                     className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${currentPage === i + 1
-                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
-                        : 'text-slate-600 hover:bg-white/80'
+                      ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                      : 'text-slate-600 hover:bg-white/80'
                       }`}
                   >
                     {i + 1}
@@ -2544,7 +2544,7 @@ function App() {
         if (!data) return [];
         // If we want a specific column, use 'rows' as it contains the raw data with all columns
         if (customKey && data.rows && Array.isArray(data.rows)) return toDropdown(data.rows, customKey);
-        
+
         // If wrapper object with options/normalized/rows
         if (data.options && Array.isArray(data.options)) return toDropdown(data.options, customKey);
         if (data.normalized && Array.isArray(data.normalized)) return toDropdown(data.normalized, customKey);
@@ -2554,9 +2554,9 @@ function App() {
           const first = data[0];
           if (first && typeof first === 'object') {
             if (customKey && customKey in first) {
-              return data.map((o: any, i: number) => ({ 
-                id: customKey === 'source' ? String(i + 1) : String(o['id'] || o[customKey] || (i + 1)), 
-                label: String(o[customKey] ?? '') 
+              return data.map((o: any, i: number) => ({
+                id: customKey === 'source' ? String(i + 1) : String(o['id'] || o[customKey] || (i + 1)),
+                label: String(o[customKey] ?? '')
               }));
             }
             if ('id' in first && 'label' in first) return data;
@@ -2655,15 +2655,30 @@ function App() {
         >
           <div className={`p-8 flex items-center ${isSidebarCollapsed ? 'justify-center px-4' : 'justify-between'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
-                <FileText className="w-6 h-6 text-white" />
-              </div>
-              {!isSidebarCollapsed && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <h1 className="text-xl font-bold text-slate-800 tracking-tight whitespace-nowrap">ระบบจัดการคดี</h1>
-                  <p className="text-xs text-slate-500 mt-0.5">Legal Case Management</p>
-                </motion.div>
+
+              {authUser.userId == 'Ufda7e6c344e079c6382d0a29388e2dc1' ? (
+                <img
+                  src="https://drive.google.com/thumbnail?id=1nK4ndNauE6H5uGcmIMByXPM17JvFZmYj&sz=w1000"
+                  alt="รูปภาพ"
+                // อย่าลืมใส่ขนาดให้รูปด้วยนะ เดี๋ยวรูปเบิ้ม!
+                />
+              ) : (
+                // ต้องมี Fragment หุ้ม เพราะมี 2 Elements อยู่ข้างกัน
+                <>
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+
+                  {!isSidebarCollapsed && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <h1 className="text-xl font-bold text-slate-800 tracking-tight whitespace-nowrap">ระบบจัดการคดี</h1>
+                      <p className="text-xs text-slate-500 mt-0.5">Legal Case Management</p>
+                    </motion.div>
+                  )}
+                </>
               )}
+
+
             </div>
           </div>
 
@@ -2673,8 +2688,8 @@ function App() {
                 key={item.id}
                 onClick={() => setCurrentView(item.id as any)}
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-start'} gap-3 px-4 py-3.5 rounded-2xl font-medium transition-all group ${currentView === item.id
-                    ? 'bg-blue-50 text-blue-700 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100/80'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100/80'
                   }`}
                 title={isSidebarCollapsed ? item.label : undefined}
               >
