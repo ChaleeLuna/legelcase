@@ -758,10 +758,9 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                       />
                     </div>
                     <div className="space-y-1.5 min-w-0">
-                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลเดือนเป็นช่วง (ตั้งแต่) <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลเดือนเป็นช่วง (ตั้งแต่)</label>
                       <input
                         type="month"
-                        required
                         value={detail.fn_OverdueBillStart}
                         onChange={(e) => {
                           const newDetails = [...formData.fn_details];
@@ -772,10 +771,9 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                       />
                     </div>
                     <div className="space-y-1.5 min-w-0">
-                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลเดือนเป็นช่วง (ถึง) <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลเดือนเป็นช่วง (ถึง)</label>
                       <input
                         type="month"
-                        required
                         value={detail.fn_OverdueBillEnd}
                         onChange={(e) => {
                           const newDetails = [...formData.fn_details];
