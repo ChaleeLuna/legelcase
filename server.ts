@@ -740,9 +740,12 @@ async function startServer() {
               : [req.body.documentDescriptions];
             desc = descriptions[index] || '';
           }
-          const uploadName = desc || file.originalname;
+          const displayName = desc || file.originalname;
+          const ext = path.extname(file.originalname);
+          const uniqueNum = `${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
+          const uploadName = `uploadFileTypes-${uniqueNum}${ext}`;
           const url = await uploadFileToGoogleDrive(file.buffer, uploadName, file.mimetype);
-          return url ? { name: desc || file.originalname, url } : null;
+          return url ? { name: displayName, url } : null;
         });
         const driveLinks = await Promise.all(uploadPromises);
         const validLinks = driveLinks.filter(Boolean);
@@ -863,9 +866,12 @@ async function startServer() {
               : [req.body.documentDescriptions];
             desc = descriptions[index] || '';
           }
-          const uploadName = desc || file.originalname;
+          const displayName = desc || file.originalname;
+          const ext = path.extname(file.originalname);
+          const uniqueNum = `${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
+          const uploadName = `uploadFileTypes-${uniqueNum}${ext}`;
           const url = await uploadFileToGoogleDrive(file.buffer, uploadName, file.mimetype);
-          return url ? { name: desc || file.originalname, url } : null;
+          return url ? { name: displayName, url } : null;
         });
         const driveLinks = await Promise.all(uploadPromises);
         const validLinks = driveLinks.filter(Boolean);
