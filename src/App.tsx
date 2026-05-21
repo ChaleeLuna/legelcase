@@ -2225,18 +2225,36 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
                 <ChevronLeft className="w-5 h-5 text-slate-600" />
               </button>
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${currentPage === i + 1
-                      ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
-                      : 'text-slate-600 hover:bg-white/80'
-                      }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
+                {(() => {
+                  const pages: (number | '...')[] = [];
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (currentPage > 4) pages.push('...');
+                    const start = Math.max(2, currentPage - 2);
+                    const end = Math.min(totalPages - 1, currentPage + 2);
+                    for (let i = start; i <= end; i++) pages.push(i);
+                    if (currentPage < totalPages - 3) pages.push('...');
+                    pages.push(totalPages);
+                  }
+                  return pages.map((p, idx) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="w-9 h-9 flex items-center justify-center text-slate-400 text-sm select-none">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p as number)}
+                        className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${currentPage === p
+                          ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                          : 'text-slate-600 hover:bg-white/80'
+                          }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  );
+                })()}
               </div>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}

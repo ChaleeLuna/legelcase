@@ -8,6 +8,8 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { google } from "googleapis";
 import * as docxTemplates from "docx-templates";
+import { Readable } from "stream";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +23,10 @@ const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '';
+const GOOGLE_IMPERSONATE_EMAIL = process.env.GOOGLE_IMPERSONATE_EMAIL || '';
+const GOOGLE_OAUTH_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
+const GOOGLE_OAUTH_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+const GOOGLE_OAUTH_REFRESH_TOKEN = process.env.GOOGLE_OAUTH_REFRESH_TOKEN || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const SUPABASE_BUCKET = 'legalcase-documents';
@@ -106,37 +112,96 @@ function buildWordDownloadName(caseData: Record<string, any>) {
   return encodeURIComponent(filename);
 }
 
-// Upload a file buffer to Supabase Storage and return the public URL
-async function uploadFileToSupabase(fileBuffer: Buffer, filePath: string, mimeType: string): Promise<string | null> {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.error('Supabase upload: SUPABASE_URL or SUPABASE_SERVICE_KEY not set');
+// Build a Google Drive auth client — mirrors rclone's auth priority:
+//   1. OAuth2 refresh token (personal Gmail)  ← GOOGLE_OAUTH_REFRESH_TOKEN
+//   2. JWT impersonation (Google Workspace)   ← GOOGLE_IMPERSONATE_EMAIL
+//   3. Plain service account (Shared Drive)   ← fallback
+function buildDriveAuth(): any {
+  if (GOOGLE_OAUTH_CLIENT_ID && GOOGLE_OAUTH_CLIENT_SECRET && GOOGLE_OAUTH_REFRESH_TOKEN) {
+    // rclone "token" style: OAuth2 with a stored refresh token.
+    // Works with regular Gmail accounts — no Workspace / Shared Drive needed.
+    console.log('Google Drive auth: using OAuth2 refresh token (personal Gmail mode)');
+    const oauth2 = new google.auth.OAuth2(
+      GOOGLE_OAUTH_CLIENT_ID,
+      GOOGLE_OAUTH_CLIENT_SECRET,
+      'urn:ietf:wg:oauth:2.0:oob' // OOB redirect — same as rclone local auth
+    );
+    oauth2.setCredentials({ refresh_token: GOOGLE_OAUTH_REFRESH_TOKEN });
+    return oauth2;
+  }
+
+  if (!GOOGLE_SERVICE_ACCOUNT_KEY) return null;
+  const key = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+
+  if (GOOGLE_IMPERSONATE_EMAIL) {
+    // rclone --drive-impersonate: JWT with subject (Google Workspace only)
+    console.log(`Google Drive auth: impersonating "${GOOGLE_IMPERSONATE_EMAIL}"`);
+    return new google.auth.JWT({
+      email: key.client_email,
+      key: key.private_key,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+      subject: GOOGLE_IMPERSONATE_EMAIL,
+    });
+  }
+
+  // Fallback: plain service account (works only with Shared Drives)
+  return new google.auth.GoogleAuth({
+    credentials: key,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+}
+
+// Upload a file buffer to Google Drive and return the public view URL.
+async function uploadFileToGoogleDrive(fileBuffer: Buffer, fileName: string, mimeType: string): Promise<string | null> {
+  const auth = buildDriveAuth();
+  if (!auth) {
+    console.error('Google Drive upload: no auth credentials configured');
     return null;
   }
   try {
-    console.log(`Supabase upload: uploading "${filePath}" to bucket "${SUPABASE_BUCKET}"`);
+    const drive = google.drive({ version: 'v3', auth });
 
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${filePath}`;
-    const resp = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        'Content-Type': mimeType,
-        'x-upsert': 'true',
-      },
-      body: new Uint8Array(fileBuffer),
-    });
+    console.log(`Google Drive upload: uploading "${fileName}"`);
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error('Supabase upload failed:', resp.status, text);
-      return null;
+    const fileMetadata: any = { name: fileName };
+    if (GOOGLE_DRIVE_FOLDER_ID) {
+      fileMetadata.parents = [GOOGLE_DRIVE_FOLDER_ID];
     }
 
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filePath}`;
-    console.log('Supabase upload success:', publicUrl);
-    return publicUrl;
+    const media = {
+      mimeType,
+      body: Readable.from(fileBuffer), // Chunked/resumable stream upload (rclone style)
+    };
+
+    const resp = await drive.files.create({
+      requestBody: fileMetadata,
+      media,
+      supportsAllDrives: true,
+      fields: 'id, webViewLink',
+    });
+
+    const fileId = resp.data.id;
+    if (!fileId) {
+      console.error('Google Drive upload failed: No file ID returned');
+      return null;
+    }
+    console.log(`Google Drive upload success: File ID ${fileId}`);
+
+    // Set anyone-with-link read permission so users can open the file in browser
+    try {
+      await drive.permissions.create({
+        fileId,
+        supportsAllDrives: true,
+        requestBody: { role: 'reader', type: 'anyone' },
+      });
+      console.log(`Permission set to public for Google Drive file ${fileId}`);
+    } catch (permErr: any) {
+      console.warn(`Failed to set public permissions for file ${fileId}:`, permErr?.message || permErr);
+    }
+
+    return resp.data.webViewLink || null;
   } catch (err: any) {
-    console.error('Supabase upload error:', err?.message || err);
+    console.error('Google Drive upload error:', err?.message || err);
     return null;
   }
 }
@@ -152,6 +217,54 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
+
+  // ── Google Drive OAuth flow (rclone-style one-time setup) ──────────────────
+  // Step 1: Visit /api/auth/drive  → redirects to Google consent screen
+  // Step 2: Google redirects to /api/auth/drive/callback
+  // Step 3: Copy the displayed GOOGLE_OAUTH_REFRESH_TOKEN into .env.local
+  app.get('/api/auth/drive', (req, res) => {
+    if (!GOOGLE_OAUTH_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) {
+      return res.status(400).send(
+        'GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must be set in .env.local first.'
+      );
+    }
+    const oauth2 = new google.auth.OAuth2(
+      GOOGLE_OAUTH_CLIENT_ID,
+      GOOGLE_OAUTH_CLIENT_SECRET,
+      `http://localhost:3000/api/auth/drive/callback`
+    );
+    const url = oauth2.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent', // force refresh_token to be returned every time
+      scope: ['https://www.googleapis.com/auth/drive'],
+    });
+    res.redirect(url);
+  });
+
+  app.get('/api/auth/drive/callback', async (req, res) => {
+    const code = req.query.code as string;
+    if (!code) return res.status(400).send('Missing code parameter');
+    try {
+      const oauth2 = new google.auth.OAuth2(
+        GOOGLE_OAUTH_CLIENT_ID,
+        GOOGLE_OAUTH_CLIENT_SECRET,
+        `http://localhost:3000/api/auth/drive/callback`
+      );
+      const { tokens } = await oauth2.getToken(code);
+      const refreshToken = tokens.refresh_token;
+      res.send(`
+        <html><body style="font-family:monospace;padding:32px;background:#f8f9fa">
+          <h2>✅ Google Drive Authorization Successful</h2>
+          <p>Copy the value below and add it to your <code>.env.local</code>:</p>
+          <pre style="background:#fff;border:1px solid #ccc;padding:16px;border-radius:8px">GOOGLE_OAUTH_REFRESH_TOKEN=${refreshToken || '(none — re-authorize with prompt=consent)'}</pre>
+          <p style="color:#888">You only need to do this once. Restart the server after saving .env.local</p>
+        </body></html>
+      `);
+    } catch (err: any) {
+      res.status(500).send(`OAuth callback error: ${err?.message || err}`);
+    }
+  });
+  // ─────────────────────────────────────────────────────────────────────────
 
   // LINE Login - check or register user, return permission
   app.post("/api/auth/line", express.json(), async (req, res) => {
@@ -617,9 +730,8 @@ async function startServer() {
         isFinish: false,
       };
 
-      // Upload court documents to Supabase if provided
+      // Upload court documents to Google Drive if provided
       if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-        const { taskType, docNumber } = newCase;
         const uploadPromises = req.files.map(async (file, index) => {
           let desc = '';
           if (req.body.documentDescriptions) {
@@ -628,12 +740,12 @@ async function startServer() {
               : [req.body.documentDescriptions];
             desc = descriptions[index] || '';
           }
-          const filePath = generateUniqueFilename(file.originalname, taskType, docNumber, desc);
-          const url = await uploadFileToSupabase(file.buffer, filePath, file.mimetype);
+          const uploadName = desc || file.originalname;
+          const url = await uploadFileToGoogleDrive(file.buffer, uploadName, file.mimetype);
           return url ? { name: desc || file.originalname, url } : null;
         });
-        const supabaseLinks = await Promise.all(uploadPromises);
-        const validLinks = supabaseLinks.filter(Boolean);
+        const driveLinks = await Promise.all(uploadPromises);
+        const validLinks = driveLinks.filter(Boolean);
         if (validLinks.length > 0) {
           newCase.courtDocument = JSON.stringify(validLinks);
         }
@@ -741,10 +853,8 @@ async function startServer() {
         return res.status(404).json({ error: 'Case not found' });
       }
 
-      // Upload court document to Supabase if a new file is provided
+      // Upload court document to Google Drive if a new file is provided
       if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-        const taskType = updateData.taskType || existing.taskType;
-        const docNumber = updateData.docNumber || existing.docNumber;
         const uploadPromises = req.files.map(async (file, index) => {
           let desc = '';
           if (req.body.documentDescriptions) {
@@ -753,12 +863,12 @@ async function startServer() {
               : [req.body.documentDescriptions];
             desc = descriptions[index] || '';
           }
-          const filePath = generateUniqueFilename(file.originalname, taskType, docNumber, desc);
-          const url = await uploadFileToSupabase(file.buffer, filePath, file.mimetype);
+          const uploadName = desc || file.originalname;
+          const url = await uploadFileToGoogleDrive(file.buffer, uploadName, file.mimetype);
           return url ? { name: desc || file.originalname, url } : null;
         });
-        const supabaseLinks = await Promise.all(uploadPromises);
-        const validLinks = supabaseLinks.filter(Boolean);
+        const driveLinks = await Promise.all(uploadPromises);
+        const validLinks = driveLinks.filter(Boolean);
 
         let existingLinks: any[] = [];
         if (updateData.keptDocuments) {
