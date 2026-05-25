@@ -742,8 +742,9 @@ async function startServer() {
           }
           const displayName = desc || file.originalname;
           const ext = path.extname(file.originalname);
+          const baseName = desc || path.basename(file.originalname, ext);
           const uniqueNum = `${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
-          const uploadName = `uploadFileTypes-${uniqueNum}${ext}`;
+          const uploadName = `${baseName}-${uniqueNum}${ext}`;
           const url = await uploadFileToGoogleDrive(file.buffer, uploadName, file.mimetype);
           return url ? { name: displayName, url } : null;
         });
@@ -868,8 +869,9 @@ async function startServer() {
           }
           const displayName = desc || file.originalname;
           const ext = path.extname(file.originalname);
+          const baseName = desc || path.basename(file.originalname, ext);
           const uniqueNum = `${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
-          const uploadName = `uploadFileTypes-${uniqueNum}${ext}`;
+          const uploadName = `${baseName}-${uniqueNum}${ext}`;
           const url = await uploadFileToGoogleDrive(file.buffer, uploadName, file.mimetype);
           return url ? { name: displayName, url } : null;
         });
