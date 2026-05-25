@@ -1224,8 +1224,22 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
 
   // Financial totals
   const totalCarDamage = carCrash.reduce((s, c) => s + (parseFloat(c.cc_damageAmount) || 0), 0);
-  const totalOverdue = overdue.reduce((s, c) => s + (parseFloat(c.op_amount) || 0), 0);
-  const totalFine = fine.reduce((s, c) => s + (parseFloat(c.fn_totalAmount) || parseFloat(c.fn_amount) || 0), 0);
+  const totalOverdue = overdue.reduce((s, c) => {
+    if (Array.isArray(c.op_details) && c.op_details.length > 0) {
+      return s + c.op_details.reduce((sum: number, d: any) => sum + (parseFloat(d.op_amount) || 0), 0);
+    }
+    return s + (parseFloat(c.op_amount) || 0);
+  }, 0);
+  const totalFine = fine.reduce((s, c) => {
+    if (parseFloat(c.fn_totalAmount)) return s + parseFloat(c.fn_totalAmount);
+    let base = Array.isArray(c.fn_details) && c.fn_details.length > 0
+      ? c.fn_details.reduce((sum: number, d: any) => sum + (parseFloat(d.fn_amount) || 0), 0)
+      : (parseFloat(c.fn_amount) || 0);
+    let add = Array.isArray(c.fn_additionalFees)
+      ? c.fn_additionalFees.reduce((sum: number, f: any) => sum + (parseFloat(f.amount) || 0), 0)
+      : 0;
+    return s + base + add;
+  }, 0);
   const grandTotal = totalCarDamage + totalOverdue + totalFine;
 
   // Lawyer workload
