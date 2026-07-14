@@ -68,7 +68,7 @@ function buildWordDownloadName(caseData: Record<string, any>) {
   let thaiTaskType = caseData.taskType || "task";
   if (thaiTaskType === 'car_crash') thaiTaskType = 'รถยนต์ชนเสา';
   else if (thaiTaskType === 'overdue_payment') thaiTaskType = 'ค่าไฟฟ้าค้างชำระ';
-  else if (thaiTaskType === 'fine') thaiTaskType = 'ค่าไฟฟ้าปรับปรุง';
+  else if (thaiTaskType === 'fine') thaiTaskType = 'ค่าละเมิดการใช้ไฟฟ้า';
 
   let customerName = '';
   let caNumbers: string[] = [];

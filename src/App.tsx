@@ -331,7 +331,7 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <Gavel className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
-                <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าไฟฟ้าปรับปรุง</span>
+                <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าละเมิดการใช้ไฟฟ้า</span>
               </button>
             </div>
             {isEditMode && <p className="text-xs text-amber-600 ml-1 mt-1">ไม่สามารถแก้ไขประเภทงานได้</p>}
@@ -674,7 +674,7 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
           >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                <Gavel className="w-5 h-5 text-amber-500" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
+                <Gavel className="w-5 h-5 text-amber-500" /> ข้อมูลคดีค่าละเมิดการใช้ไฟฟ้า
               </h3>
               <button
                 type="button"
@@ -1255,7 +1255,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
   const typeData = [
     { name: 'รถยนต์ชนเสา', value: carCrash.length },
     { name: 'ค่าไฟฟ้าค้างชำระ', value: overdue.length },
-    { name: 'ค่าไฟฟ้าปรับปรุง', value: fine.length },
+    { name: 'ค่าละเมิดการใช้ไฟฟ้า', value: fine.length },
   ];
 
   const statusChartData = [
@@ -1298,7 +1298,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
           <StatCard icon={<LayoutDashboard className="w-5 h-5 sm:w-7 sm:h-7 text-indigo-600" />} label="คดีที่กำลังดำเนินการ" value={activeCases.length} sub={`จัดเก็บแล้ว ${archivedCases.length} คดี`} color="bg-indigo-50" />
           <StatCard icon={<Car className="w-5 h-5 sm:w-7 sm:h-7 text-blue-600" />} label="รถยนต์ชนเสา" value={carCrash.length} sub={`${fmt(totalCarDamage)} บาท`} color="bg-blue-50" />
           <StatCard icon={<CreditCard className="w-5 h-5 sm:w-7 sm:h-7 text-emerald-600" />} label="ค่าไฟฟ้าค้างชำระ" value={overdue.length} sub={`${fmt(totalOverdue)} บาท`} color="bg-emerald-50" />
-          <StatCard icon={<Gavel className="w-5 h-5 sm:w-7 sm:h-7 text-amber-600" />} label="ค่าไฟฟ้าปรับปรุง" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
+          <StatCard icon={<Gavel className="w-5 h-5 sm:w-7 sm:h-7 text-amber-600" />} label="ค่าละเมิดการใช้ไฟฟ้า" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
         </div>
 
         {/* มูลค่ารวม */}
@@ -1668,7 +1668,7 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               <FileText className="w-4 h-4 text-indigo-400" /> ข้อมูลทั่วไป
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="ประเภทงาน" value={caseData.taskType === 'car_crash' ? 'รถยนต์ชนเสา' : caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' : 'ค่าไฟฟ้าปรับปรุง'} />
+              <Field label="ประเภทงาน" value={caseData.taskType === 'car_crash' ? 'รถยนต์ชนเสา' : caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' : 'ค่าละเมิดการใช้ไฟฟ้า'} />
               <Field label="ต้นทางเอกสาร" value={caseData.sourceName} />
               <Field label="วันที่รับเรื่อง" value={caseData.receiveDate} />
               <Field label="เลขที่หนังสือ" value={caseData.docNumber} />
@@ -1759,7 +1759,7 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
           {caseData.taskType === 'fine' && (
             <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <Gavel className="w-4 h-4 text-amber-400" /> ข้อมูลคดีค่าไฟฟ้าปรับปรุง
+                <Gavel className="w-4 h-4 text-amber-400" /> ข้อมูลคดีค่าละเมิดการใช้ไฟฟ้า
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 <Field label="ชื่อนามสกุล" value={caseData.fn_customerName} />
@@ -2097,7 +2097,7 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
     } else if (c.taskType === 'fine') {
       name = c.fn_customerName;
       referenceNumber = c.fn_ReferenceNumber;
-      type = c.fn_fineTypeName || 'ค่าไฟฟ้าปรับปรุง';
+      type = c.fn_fineTypeName || 'ค่าละเมิดการใช้ไฟฟ้า';
     }
     return { name, referenceNumber, type };
   };
