@@ -1550,7 +1550,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
       </div>
       <div className="min-w-0 w-full">
         <p className="text-xs text-slate-500 font-medium leading-tight truncate px-1">{label}</p>
-        <p className="text-2xl font-bold text-slate-800 leading-tight mt-1">{value}</p>
+        <p className="text-2xl font-bold text-slate-800 leading-tight mt-1">{value} คดี</p>
         {sub && <p className="text-[11px] text-slate-400 mt-1 leading-tight truncate px-1">{sub}</p>}
       </div>
     </div>
@@ -1653,8 +1653,8 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
                 );
               })}
               {sourceData.length > 8 && (
-                <button 
-                  onClick={() => setShowAllSourcesModal(true)} 
+                <button
+                  onClick={() => setShowAllSourcesModal(true)}
                   className="w-full mt-4 py-2 text-sm text-indigo-600 font-medium bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
                 >
                   ดูเพิ่มเติม ({sourceData.length - 8} ต้นทาง)
@@ -1999,11 +1999,11 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="ประเภทงาน" value={
                 caseData.taskType === 'car_crash' ? 'รถยนต์ชนเสา' :
-                caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' :
-                caseData.taskType === 'fine' ? 'ค่าละเมิดการใช้ไฟฟ้า' :
-                caseData.taskType === 'gov_debt' ? 'ลูกหนี้ราชการ' :
-                caseData.taskType === 'fine_btc' ? 'ค่าละเมิดบิทคอยน์' :
-                caseData.taskType === 'fine_cable' ? 'ค่าละเมิดสายสื่อสาร' : caseData.taskType
+                  caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' :
+                    caseData.taskType === 'fine' ? 'ค่าละเมิดการใช้ไฟฟ้า' :
+                      caseData.taskType === 'gov_debt' ? 'ลูกหนี้ราชการ' :
+                        caseData.taskType === 'fine_btc' ? 'ค่าละเมิดบิทคอยน์' :
+                          caseData.taskType === 'fine_cable' ? 'ค่าละเมิดสายสื่อสาร' : caseData.taskType
               } />
               <Field label="ต้นทางเอกสาร" value={caseData.sourceName} />
               <Field label="วันที่รับเรื่อง" value={caseData.receiveDate} />
