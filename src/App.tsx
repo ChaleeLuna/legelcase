@@ -1454,6 +1454,7 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
 
 // Stats Dashboard Component
 const StatsDashboard = ({ cases }: { cases: any[] }) => {
+  const [showAllSourcesModal, setShowAllSourcesModal] = useState(false);
   const isArchivedVal = (v: any) => { const s = String(v).trim().toLowerCase(); return s === 'true' || s === '1' || s === 'yes'; };
   const activeCases = cases.filter(c => !isArchivedVal(c.isArchived));
   const archivedCases = cases.filter(c => isArchivedVal(c.isArchived));
@@ -1462,6 +1463,9 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
   const carCrash = activeCases.filter(c => c.taskType === 'car_crash');
   const overdue = activeCases.filter(c => c.taskType === 'overdue_payment');
   const fine = activeCases.filter(c => c.taskType === 'fine');
+  const govDebt = activeCases.filter(c => c.taskType === 'gov_debt');
+  const fineBtc = activeCases.filter(c => c.taskType === 'fine_btc');
+  const fineCable = activeCases.filter(c => c.taskType === 'fine_cable');
 
   // Status breakdown
   const byStatus = (name: string) => activeCases.filter(c => c.taskStateName === name).length;
@@ -1484,7 +1488,32 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
       : 0;
     return s + base + add;
   }, 0);
-  const grandTotal = totalCarDamage + totalOverdue + totalFine;
+  const totalGovDebt = govDebt.reduce((s, c) => {
+    let base = Array.isArray(c.fngov_details) && c.fngov_details.length > 0
+      ? c.fngov_details.reduce((sum: number, d: any) => sum + (parseFloat(d.fngov_amount) || 0), 0)
+      : 0;
+    let add = Array.isArray(c.fngov_additionalFees)
+      ? c.fngov_additionalFees.reduce((sum: number, f: any) => sum + (parseFloat(f.amount) || 0), 0)
+      : 0;
+    return s + base + add;
+  }, 0);
+  const totalFineBtc = fineBtc.reduce((s, c) => {
+    let base = Array.isArray(c.fnbtc_details) && c.fnbtc_details.length > 0
+      ? c.fnbtc_details.reduce((sum: number, d: any) => sum + (parseFloat(d.fnbtc_amount) || 0), 0)
+      : 0;
+    let add = Array.isArray(c.fnbtc_additionalFees)
+      ? c.fnbtc_additionalFees.reduce((sum: number, f: any) => sum + (parseFloat(f.amount) || 0), 0)
+      : 0;
+    return s + base + add;
+  }, 0);
+  const totalFineCable = fineCable.reduce((s, c) => {
+    let base = parseFloat(c.fncable_amount) || 0;
+    let add = Array.isArray(c.fncable_additionalFees)
+      ? c.fncable_additionalFees.reduce((sum: number, f: any) => sum + (parseFloat(f.amount) || 0), 0)
+      : 0;
+    return s + base + add;
+  }, 0);
+  const grandTotal = totalCarDamage + totalOverdue + totalFine + totalGovDebt + totalFineBtc + totalFineCable;
 
   // Lawyer workload
   const lawyerMap: Record<string, number> = {};
@@ -1500,7 +1529,10 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
     { name: 'รถยนต์ชนเสา', value: carCrash.length },
     { name: 'ค่าไฟฟ้าค้างชำระ', value: overdue.length },
     { name: 'ค่าละเมิดการใช้ไฟฟ้า', value: fine.length },
-  ];
+    { name: 'ลูกหนี้ราชการ', value: govDebt.length },
+    { name: 'ค่าละเมิดบิทคอยน์', value: fineBtc.length },
+    { name: 'ค่าละเมิดสายสื่อสาร', value: fineCable.length },
+  ].filter(d => d.value > 0);
 
   const statusChartData = [
     { name: 'รับเรื่อง', value: byStatus('รับเรื่อง'), color: '#3b82f6' },
@@ -1508,18 +1540,18 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
     { name: 'เสร็จสิ้น', value: byStatus('เสร็จสิ้น'), color: '#10b981' },
   ];
 
-  const TYPE_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
+  const TYPE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f97316', '#06b6d4'];
   const fmt = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   const StatCard = ({ icon, label, value, sub, color }: any) => (
-    <div className={`bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4`}>
-      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
+    <div className={`bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-3xl p-4 flex flex-col items-center text-center gap-2 lg:gap-3`}>
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-xs sm:text-sm text-slate-500 font-medium leading-tight">{label}</p>
-        <p className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">{value}</p>
-        {sub && <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 leading-tight">{sub}</p>}
+      <div className="min-w-0 w-full">
+        <p className="text-xs text-slate-500 font-medium leading-tight truncate px-1">{label}</p>
+        <p className="text-2xl font-bold text-slate-800 leading-tight mt-1">{value}</p>
+        {sub && <p className="text-[11px] text-slate-400 mt-1 leading-tight truncate px-1">{sub}</p>}
       </div>
     </div>
   );
@@ -1538,25 +1570,34 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
           <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full" />
           <h3 className="text-base font-semibold text-slate-700">ภาพรวมสำหรับผู้บริหาร</h3>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={<LayoutDashboard className="w-5 h-5 sm:w-7 sm:h-7 text-indigo-600" />} label="คดีที่กำลังดำเนินการ" value={activeCases.length} sub={`จัดเก็บแล้ว ${archivedCases.length} คดี`} color="bg-indigo-50" />
-          <StatCard icon={<Car className="w-5 h-5 sm:w-7 sm:h-7 text-blue-600" />} label="รถยนต์ชนเสา" value={carCrash.length} sub={`${fmt(totalCarDamage)} บาท`} color="bg-blue-50" />
-          <StatCard icon={<CreditCard className="w-5 h-5 sm:w-7 sm:h-7 text-emerald-600" />} label="ค่าไฟฟ้าค้างชำระ" value={overdue.length} sub={`${fmt(totalOverdue)} บาท`} color="bg-emerald-50" />
-          <StatCard icon={<Gavel className="w-5 h-5 sm:w-7 sm:h-7 text-amber-600" />} label="ค่าละเมิดการใช้ไฟฟ้า" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 lg:gap-4">
+          <StatCard icon={<LayoutDashboard className="w-6 h-6 text-indigo-600" />} label="กำลังดำเนินการ" value={activeCases.length} sub={`จัดเก็บ ${archivedCases.length} คดี`} color="bg-indigo-50" />
+          <StatCard icon={<Car className="w-6 h-6 text-blue-600" />} label="รถยนต์ชนเสา" value={carCrash.length} sub={`${fmt(totalCarDamage)} บาท`} color="bg-blue-50" />
+          <StatCard icon={<CreditCard className="w-6 h-6 text-emerald-600" />} label="ค่าไฟค้างชำระ" value={overdue.length} sub={`${fmt(totalOverdue)} บาท`} color="bg-emerald-50" />
+          <StatCard icon={<Gavel className="w-6 h-6 text-amber-600" />} label="ละเมิดการใช้ไฟฟ้า" value={fine.length} sub={`${fmt(totalFine)} บาท`} color="bg-amber-50" />
+          <StatCard icon={<FileCheck className="w-6 h-6 text-violet-600" />} label="ลูกหนี้ราชการ" value={govDebt.length} sub={`${fmt(totalGovDebt)} บาท`} color="bg-violet-50" />
+          <StatCard icon={<Hash className="w-6 h-6 text-orange-600" />} label="ละเมิดบิทคอยน์" value={fineBtc.length} sub={`${fmt(totalFineBtc)} บาท`} color="bg-orange-50" />
+          <StatCard icon={<AlertCircle className="w-6 h-6 text-cyan-600" />} label="ละเมิดสายสื่อสาร" value={fineCable.length} sub={`${fmt(totalFineCable)} บาท`} color="bg-cyan-50" />
         </div>
 
         {/* มูลค่ารวม */}
-        <div className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="text-indigo-100 text-sm font-medium">มูลค่าความเสียหายรวมทั้งหมด (Active)</p>
+        <div className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-6 text-white flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div className="shrink-0 text-center lg:text-left">
+            <p className="text-indigo-100 text-sm font-medium">มูลค่าความเสียหายรวม (Active)</p>
             <p className="text-4xl font-bold mt-1">{fmt(grandTotal)} <span className="text-2xl font-normal text-indigo-200">บาท</span></p>
           </div>
-          <div className="flex gap-6 text-center">
-            <div><p className="text-indigo-200 text-xs">รถชน</p><p className="text-xl font-bold">{fmt(totalCarDamage)}</p></div>
-            <div className="w-px bg-indigo-400/50" />
-            <div><p className="text-indigo-200 text-xs">ค่าไฟค้าง</p><p className="text-xl font-bold">{fmt(totalOverdue)}</p></div>
-            <div className="w-px bg-indigo-400/50" />
-            <div><p className="text-indigo-200 text-xs">ค่าปรับ</p><p className="text-xl font-bold">{fmt(totalFine)}</p></div>
+          <div className="flex flex-wrap justify-center lg:justify-end gap-x-4 sm:gap-x-6 gap-y-3 text-center">
+            <div><p className="text-indigo-200 text-xs">รถชน</p><p className="text-lg font-bold">{fmt(totalCarDamage)}</p></div>
+            <div className="w-px bg-indigo-400/50 hidden sm:block" />
+            <div><p className="text-indigo-200 text-xs">ค่าไฟค้าง</p><p className="text-lg font-bold">{fmt(totalOverdue)}</p></div>
+            <div className="w-px bg-indigo-400/50 hidden sm:block" />
+            <div><p className="text-indigo-200 text-xs">ค่าปรับ</p><p className="text-lg font-bold">{fmt(totalFine)}</p></div>
+            <div className="w-px bg-indigo-400/50 hidden sm:block" />
+            <div><p className="text-indigo-200 text-xs">หนี้ราชการ</p><p className="text-lg font-bold">{fmt(totalGovDebt)}</p></div>
+            <div className="w-px bg-indigo-400/50 hidden sm:block" />
+            <div><p className="text-indigo-200 text-xs">บิทคอยน์</p><p className="text-lg font-bold">{fmt(totalFineBtc)}</p></div>
+            <div className="w-px bg-indigo-400/50 hidden sm:block" />
+            <div><p className="text-indigo-200 text-xs">สายสื่อสาร</p><p className="text-lg font-bold">{fmt(totalFineCable)}</p></div>
           </div>
         </div>
       </div>
@@ -1596,7 +1637,7 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
             <p className="text-slate-400 text-sm text-center mt-8">ไม่มีข้อมูล</p>
           ) : (
             <div className="space-y-3 mt-2">
-              {sourceData.map((s, i) => {
+              {sourceData.slice(0, 8).map((s, i) => {
                 const pct = activeCases.length > 0 ? Math.round((s.value / activeCases.length) * 100) : 0;
                 const colors = ['bg-indigo-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500'];
                 return (
@@ -1611,6 +1652,14 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
                   </div>
                 );
               })}
+              {sourceData.length > 8 && (
+                <button 
+                  onClick={() => setShowAllSourcesModal(true)} 
+                  className="w-full mt-4 py-2 text-sm text-indigo-600 font-medium bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+                >
+                  ดูเพิ่มเติม ({sourceData.length - 8} ต้นทาง)
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1690,6 +1739,42 @@ const StatsDashboard = ({ cases }: { cases: any[] }) => {
           </div>
         </div>
       </div>
+
+      {/* Modal คดีตามต้นทางทั้งหมด */}
+      <AnimatePresence>
+        {showAllSourcesModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAllSourcesModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-lg relative z-10 flex flex-col max-h-[85vh] overflow-hidden border border-white/40">
+              <div className="px-6 py-4 border-b border-slate-200/50 flex items-center justify-between shrink-0">
+                <h3 className="text-lg font-bold text-slate-800">คดีตามต้นทางทั้งหมด</h3>
+                <button onClick={() => setShowAllSourcesModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <div className="space-y-4">
+                  {sourceData.map((s, i) => {
+                    const pct = activeCases.length > 0 ? Math.round((s.value / activeCases.length) * 100) : 0;
+                    const colors = ['bg-indigo-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500'];
+                    return (
+                      <div key={s.name}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-600 truncate max-w-[250px]">{s.name}</span>
+                          <span className="font-semibold text-slate-800 shrink-0 ml-2">{s.value} ({pct}%)</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${colors[i % colors.length]} transition-all`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
