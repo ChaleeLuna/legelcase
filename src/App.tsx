@@ -294,44 +294,81 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          <div className="space-y-2">
+          {/* ประเภทงาน - full width */}
+          <div className="md:col-span-2 space-y-2">
             <label className="text-sm font-medium text-slate-700 ml-1">ประเภทงาน <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'car_crash' })}
-                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'car_crash'
+                className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all min-h-[4rem] ${formData.taskType === 'car_crash'
                   ? 'border-blue-500 bg-blue-50/50 text-blue-700'
                   : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <Car className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
-                <span className="text-xs sm:text-sm font-medium text-center leading-tight">รถยนต์ชนเสา</span>
+                <Car className="w-5 h-5 shrink-0" />
+                <span className="text-[11px] font-medium text-center leading-tight">รถยนต์ชนเสา</span>
               </button>
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'overdue_payment' })}
-                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'overdue_payment'
+                className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all min-h-[4rem] ${formData.taskType === 'overdue_payment'
                   ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700'
                   : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
-                <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าไฟฟ้าค้างชำระ</span>
+                <CreditCard className="w-5 h-5 shrink-0" />
+                <span className="text-[11px] font-medium text-center leading-tight">ค่าไฟฟ้าค้างชำระ</span>
               </button>
               <button
                 type="button"
                 disabled={isEditMode}
                 onClick={() => setFormData({ ...formData, taskType: 'fine', fn_additionalFees: [] })}
-                className={`flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-0 p-3 rounded-lg border-2 transition-all min-h-16 ${formData.taskType === 'fine'
+                className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all min-h-[4rem] ${formData.taskType === 'fine'
                   ? 'border-amber-500 bg-amber-50/50 text-amber-700'
                   : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
                   } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <Gavel className="w-5 h-5 sm:w-6 sm:h-6 sm:mb-2 shrink-0" />
-                <span className="text-xs sm:text-sm font-medium text-center leading-tight">ค่าละเมิดการใช้ไฟฟ้า</span>
+                <Gavel className="w-5 h-5 shrink-0" />
+                <span className="text-[11px] font-medium text-center leading-tight">ค่าละเมิดการใช้ไฟฟ้า</span>
+              </button>
+              <button
+                type="button"
+                disabled={isEditMode}
+                onClick={() => setFormData({ ...formData, taskType: 'gov_debt', fngov_details: [], fngov_additionalFees: [] })}
+                className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all min-h-[4rem] ${formData.taskType === 'gov_debt'
+                  ? 'border-violet-500 bg-violet-50/50 text-violet-700'
+                  : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                  } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                <FileCheck className="w-5 h-5 shrink-0" />
+                <span className="text-[11px] font-medium text-center leading-tight">ลูกหนี้ราชการ</span>
+              </button>
+              <button
+                type="button"
+                disabled={isEditMode}
+                onClick={() => setFormData({ ...formData, taskType: 'fine_btc', fnbtc_details: [], fnbtc_additionalFees: [] })}
+                className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all min-h-[4rem] ${formData.taskType === 'fine_btc'
+                  ? 'border-orange-500 bg-orange-50/50 text-orange-700'
+                  : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                  } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                <Hash className="w-5 h-5 shrink-0" />
+                <span className="text-[11px] font-medium text-center leading-tight">ค่าละเมิดบิทคอยน์</span>
+              </button>
+              <button
+                type="button"
+                disabled={isEditMode}
+                onClick={() => setFormData({ ...formData, taskType: 'fine_cable' })}
+                className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all min-h-[4rem] ${formData.taskType === 'fine_cable'
+                  ? 'border-cyan-500 bg-cyan-50/50 text-cyan-700'
+                  : 'border-slate-100 bg-white/50 text-slate-500 hover:border-slate-200'
+                  } ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <span className="text-[11px] font-medium text-center leading-tight">ค่าละเมิดสายสื่อสาร</span>
               </button>
             </div>
             {isEditMode && <p className="text-xs text-amber-600 ml-1 mt-1">ไม่สามารถแก้ไขประเภทงานได้</p>}
@@ -863,6 +900,197 @@ const CaseFormFields = ({ formData, setFormData, files, setFiles, dropdowns, isE
             </div>
           </motion.section>
         )}
+
+        {/* ── ลูกหนี้ราชการ ── */}
+        {formData.taskType === 'gov_debt' && (
+          <motion.section
+            key="gov_debt"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-violet-500" /> ข้อมูลคดีลูกหนี้ราชการ
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const newDetails = [...(formData.fngov_details || [])];
+                  newDetails.push({ fngov_ReferenceNumber: '', fngov_agencyBranch: '', fngov_OverdueBillStart: '', fngov_overdueBillEnd: '', fngov_amount: '' });
+                  setFormData({ ...formData, fngov_details: newDetails });
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-xl transition-colors font-medium"
+              >
+                <Plus className="w-4 h-4" /> เพิ่มรายการ CA
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
+                <input type="text" name="fngov_customerName" required value={formData.fngov_customerName || ''} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all placeholder-slate-400" />
+              </div>
+
+              {(formData.fngov_details || []).map((detail: any, index: number) => (
+                <div key={index} className="relative p-4 sm:p-8 rounded-3xl border border-slate-200 bg-white/80 shadow-sm space-y-6 transition-all hover:shadow-md w-full">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <span className="text-xs font-bold text-violet-600 uppercase tracking-wider bg-violet-50 px-3 py-1.5 rounded-lg">รายการที่ {index + 1}</span>
+                    <button type="button" onClick={() => { const nd = [...formData.fngov_details]; nd.splice(index, 1); setFormData({ ...formData, fngov_details: nd }); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">เลขที่อ้างอิง (CA) <span className="text-red-500">*</span></label>
+                      <input type="text" required value={detail.fngov_ReferenceNumber} onChange={(e) => { const nd = [...formData.fngov_details]; nd[index].fngov_ReferenceNumber = e.target.value; setFormData({ ...formData, fngov_details: nd }); }} placeholder="ระบุเลขที่อ้างอิง (CA)" className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">สาขาหน่วยงาน <span className="text-red-500">*</span></label>
+                      <input type="text" required value={detail.fngov_agencyBranch || ''} onChange={(e) => { const nd = [...formData.fngov_details]; nd[index].fngov_agencyBranch = e.target.value; setFormData({ ...formData, fngov_details: nd }); }} placeholder="ระบุสาขาหน่วยงาน" className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">จำนวนเงิน (บาท) <span className="text-red-500">*</span></label>
+                      <input type="number" required value={detail.fngov_amount} onChange={(e) => { const nd = [...formData.fngov_details]; nd[index].fngov_amount = e.target.value; setFormData({ ...formData, fngov_details: nd }); }} placeholder="0.00" className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลที่ค้าง (ตั้งแต่) <span className="text-red-500">*</span></label>
+                      <input type="month" required value={detail.fngov_OverdueBillStart} onChange={(e) => { const nd = [...formData.fngov_details]; nd[index].fngov_OverdueBillStart = e.target.value; setFormData({ ...formData, fngov_details: nd }); }} className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลที่ค้าง (ถึง) <span className="text-red-500">*</span></label>
+                      <input type="month" required value={detail.fngov_overdueBillEnd} onChange={(e) => { const nd = [...formData.fngov_details]; nd[index].fngov_overdueBillEnd = e.target.value; setFormData({ ...formData, fngov_details: nd }); }} className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(!formData.fngov_details || formData.fngov_details.length === 0) && (
+                <div className="text-center py-4 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  ยังไม่มีข้อมูล CA (กดปุ่มเพิ่มรายการ CA ด้านบน)
+                </div>
+              )}
+
+              <div className="space-y-2 mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-sm font-medium text-slate-700">ค่าอื่นๆ</label>
+                  <button type="button" onClick={() => { const nf = [...(formData.fngov_additionalFees || [])]; nf.push({ name: '', amount: '' }); setFormData({ ...formData, fngov_additionalFees: nf }); }} className="flex items-center gap-2 px-3 py-2 text-sm bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-xl transition-colors font-medium"><Plus className="w-4 h-4" /> เพิ่มค่าอื่นๆ</button>
+                </div>
+                <div className="space-y-3">
+                  {(formData.fngov_additionalFees || []).map((fee: any, idx: number) => (
+                    <div key={idx} className="flex gap-3 items-end">
+                      <input type="text" placeholder="ชื่อค่าธรรมเนียม" value={fee.name || ''} onChange={(e) => { const nf = [...(formData.fngov_additionalFees || [])]; nf[idx] = { ...nf[idx], name: e.target.value }; setFormData({ ...formData, fngov_additionalFees: nf }); }} className="flex-1 px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all placeholder-slate-400 text-sm" />
+                      <input type="number" placeholder="จำนวนเงิน" value={fee.amount || ''} onChange={(e) => { const nf = [...(formData.fngov_additionalFees || [])]; nf[idx] = { ...nf[idx], amount: e.target.value }; setFormData({ ...formData, fngov_additionalFees: nf }); }} className="w-24 px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all placeholder-slate-400 text-sm" />
+                      <button type="button" onClick={() => { const nf = (formData.fngov_additionalFees || []).filter((_: any, i: number) => i !== idx); setFormData({ ...formData, fngov_additionalFees: nf }); }} className="p-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* ── ค่าละเมิดบิทคอยน์ ── */}
+        {formData.taskType === 'fine_btc' && (
+          <motion.section
+            key="fine_btc"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <Hash className="w-5 h-5 text-orange-500" /> ข้อมูลคดีค่าละเมิดบิทคอยน์
+              </h3>
+              <button type="button" onClick={() => { const nd = [...(formData.fnbtc_details || [])]; nd.push({ fnbtc_ReferenceNumber: '', fnbtc_OverdueBillStart: '', fnbtc_overdueBillEnd: '', fnbtc_amount: '' }); setFormData({ ...formData, fnbtc_details: nd }); }} className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-xl transition-colors font-medium"><Plus className="w-4 h-4" /> เพิ่มรายการ CA</button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
+                <input type="text" name="fnbtc_customerName" required value={formData.fnbtc_customerName || ''} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all placeholder-slate-400" />
+              </div>
+
+              {(formData.fnbtc_details || []).map((detail: any, index: number) => (
+                <div key={index} className="relative p-4 sm:p-8 rounded-3xl border border-slate-200 bg-white/80 shadow-sm space-y-6 transition-all hover:shadow-md w-full">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <span className="text-xs font-bold text-orange-600 uppercase tracking-wider bg-orange-50 px-3 py-1.5 rounded-lg">รายการที่ {index + 1}</span>
+                    <button type="button" onClick={() => { const nd = [...formData.fnbtc_details]; nd.splice(index, 1); setFormData({ ...formData, fnbtc_details: nd }); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">เลขที่อ้างอิง (CA) <span className="text-red-500">*</span></label>
+                      <input type="text" required value={detail.fnbtc_ReferenceNumber} onChange={(e) => { const nd = [...formData.fnbtc_details]; nd[index].fnbtc_ReferenceNumber = e.target.value; setFormData({ ...formData, fnbtc_details: nd }); }} placeholder="ระบุเลขที่อ้างอิง (CA)" className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">จำนวนเงิน (บาท) <span className="text-red-500">*</span></label>
+                      <input type="number" required value={detail.fnbtc_amount} onChange={(e) => { const nd = [...formData.fnbtc_details]; nd[index].fnbtc_amount = e.target.value; setFormData({ ...formData, fnbtc_details: nd }); }} placeholder="0.00" className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลที่ค้าง (ตั้งแต่) <span className="text-red-500">*</span></label>
+                      <input type="month" required value={detail.fnbtc_OverdueBillStart} onChange={(e) => { const nd = [...formData.fnbtc_details]; nd[index].fnbtc_OverdueBillStart = e.target.value; setFormData({ ...formData, fnbtc_details: nd }); }} className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <label className="text-xs font-semibold text-slate-600 ml-1">บิลที่ค้าง (ถึง) <span className="text-red-500">*</span></label>
+                      <input type="month" required value={detail.fnbtc_overdueBillEnd} onChange={(e) => { const nd = [...formData.fnbtc_details]; nd[index].fnbtc_overdueBillEnd = e.target.value; setFormData({ ...formData, fnbtc_details: nd }); }} className="w-full px-4 py-3 text-base bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(!formData.fnbtc_details || formData.fnbtc_details.length === 0) && (
+                <div className="text-center py-4 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  ยังไม่มีข้อมูล CA (กดปุ่มเพิ่มรายการ CA ด้านบน)
+                </div>
+              )}
+
+              <div className="space-y-2 mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-sm font-medium text-slate-700">ค่าอื่นๆ</label>
+                  <button type="button" onClick={() => { const nf = [...(formData.fnbtc_additionalFees || [])]; nf.push({ name: '', amount: '' }); setFormData({ ...formData, fnbtc_additionalFees: nf }); }} className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-xl transition-colors font-medium"><Plus className="w-4 h-4" /> เพิ่มค่าอื่นๆ</button>
+                </div>
+                <div className="space-y-3">
+                  {(formData.fnbtc_additionalFees || []).map((fee: any, idx: number) => (
+                    <div key={idx} className="flex gap-3 items-end">
+                      <input type="text" placeholder="ชื่อค่าธรรมเนียม" value={fee.name || ''} onChange={(e) => { const nf = [...(formData.fnbtc_additionalFees || [])]; nf[idx] = { ...nf[idx], name: e.target.value }; setFormData({ ...formData, fnbtc_additionalFees: nf }); }} className="flex-1 px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all placeholder-slate-400 text-sm" />
+                      <input type="number" placeholder="จำนวนเงิน" value={fee.amount || ''} onChange={(e) => { const nf = [...(formData.fnbtc_additionalFees || [])]; nf[idx] = { ...nf[idx], amount: e.target.value }; setFormData({ ...formData, fnbtc_additionalFees: nf }); }} className="w-24 px-4 py-3 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all placeholder-slate-400 text-sm" />
+                      <button type="button" onClick={() => { const nf = (formData.fnbtc_additionalFees || []).filter((_: any, i: number) => i !== idx); setFormData({ ...formData, fnbtc_additionalFees: nf }); }} className="p-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* ── ค่าละเมิดสายสื่อสาร ── */}
+        {formData.taskType === 'fine_cable' && (
+          <motion.section
+            key="fine_cable"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white/50 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/40 shadow-sm"
+          >
+            <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-cyan-500" /> ข้อมูลคดีค่าละเมิดสายสื่อสาร
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">ชื่อนามสกุล <span className="text-red-500">*</span></label>
+                <input type="text" name="fncable_customerName" required value={formData.fncable_customerName || ''} onChange={handleChange} placeholder="ระบุชื่อนามสกุล" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all placeholder-slate-400" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">จำนวนเงิน (บาท) <span className="text-red-500">*</span></label>
+                <input type="number" name="fncable_amount" required value={formData.fncable_amount || ''} onChange={handleChange} placeholder="0.00" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all placeholder-slate-400" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 ml-1">วันที่ตรวจพบ <span className="text-red-500">*</span></label>
+                <input type="date" name="fncable_detectedDate" required value={formData.fncable_detectedDate || ''} onChange={handleChange} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all" />
+              </div>
+            </div>
+          </motion.section>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -975,6 +1203,20 @@ const EditModal = ({ caseData, onClose, dropdowns, onSaveSuccess }: any) => {
       }
       return details;
     })(),
+    // gov_debt fields
+    fngov_customerName: caseData.fngov_customerName || "",
+    fngov_details: (() => { try { return Array.isArray(caseData.fngov_details) ? caseData.fngov_details : JSON.parse(caseData.fngov_details || '[]'); } catch { return []; } })(),
+    fngov_additionalFees: (() => { try { return Array.isArray(caseData.fngov_additionalFees) ? caseData.fngov_additionalFees : JSON.parse(caseData.fngov_additionalFees || '[]'); } catch { return []; } })(),
+    // fine_btc fields
+    fnbtc_customerName: caseData.fnbtc_customerName || "",
+    fnbtc_details: (() => { try { return Array.isArray(caseData.fnbtc_details) ? caseData.fnbtc_details : JSON.parse(caseData.fnbtc_details || '[]'); } catch { return []; } })(),
+    fnbtc_additionalFees: (() => { try { return Array.isArray(caseData.fnbtc_additionalFees) ? caseData.fnbtc_additionalFees : JSON.parse(caseData.fnbtc_additionalFees || '[]'); } catch { return []; } })(),
+    // fine_cable fields
+    fncable_customerName: caseData.fncable_customerName || "",
+    fncable_amount: caseData.fncable_amount || "",
+    fncable_detectedDate: caseData.fncable_detectedDate || "",
+    fncable_details: (() => { try { return Array.isArray(caseData.fncable_details) ? caseData.fncable_details : JSON.parse(caseData.fncable_details || '[]'); } catch { return []; } })(),
+    fncable_additionalFees: (() => { try { return Array.isArray(caseData.fncable_additionalFees) ? caseData.fncable_additionalFees : JSON.parse(caseData.fncable_additionalFees || '[]'); } catch { return []; } })(),
     notes: caseData.notes || "",
     courtDocument: caseData.courtDocument || "",
     keptDocuments: parseCourtDocuments(caseData.courtDocument),
@@ -1668,7 +1910,14 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               <FileText className="w-4 h-4 text-indigo-400" /> ข้อมูลทั่วไป
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="ประเภทงาน" value={caseData.taskType === 'car_crash' ? 'รถยนต์ชนเสา' : caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' : 'ค่าละเมิดการใช้ไฟฟ้า'} />
+              <Field label="ประเภทงาน" value={
+                caseData.taskType === 'car_crash' ? 'รถยนต์ชนเสา' :
+                caseData.taskType === 'overdue_payment' ? 'ค่าไฟฟ้าค้างชำระ' :
+                caseData.taskType === 'fine' ? 'ค่าละเมิดการใช้ไฟฟ้า' :
+                caseData.taskType === 'gov_debt' ? 'ลูกหนี้ราชการ' :
+                caseData.taskType === 'fine_btc' ? 'ค่าละเมิดบิทคอยน์' :
+                caseData.taskType === 'fine_cable' ? 'ค่าละเมิดสายสื่อสาร' : caseData.taskType
+              } />
               <Field label="ต้นทางเอกสาร" value={caseData.sourceName} />
               <Field label="วันที่รับเรื่อง" value={caseData.receiveDate} />
               <Field label="เลขที่หนังสือ" value={caseData.docNumber} />
@@ -1825,6 +2074,92 @@ const CaseDetailModal = ({ caseData, onClose, onUnarchive }: { caseData: any; on
               </div>
             </section>
           )}
+
+          {/* gov_debt detail */}
+          {caseData.taskType === 'gov_debt' && (
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-violet-400" /> ข้อมูลคดีลูกหนี้ราชการ
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                <Field label="ชื่อนามสกุล" value={caseData.fngov_customerName} />
+                {Array.isArray(caseData.fngov_details) && caseData.fngov_details.length > 0 && (
+                  <div className="mt-2 space-y-3">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">รายการ CA ทั้งหมด</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {caseData.fngov_details.map((d: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-xl bg-violet-50/50 border border-violet-100/50">
+                          <p className="text-[10px] font-bold text-violet-600 mb-1">CA: {d.fngov_ReferenceNumber} | สาขา: {d.fngov_agencyBranch}</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div><p className="text-slate-500 text-[10px]">ตั้งแต่ - ถึง</p><p className="font-medium text-slate-700">{d.fngov_OverdueBillStart} - {d.fngov_overdueBillEnd}</p></div>
+                            <div className="text-right"><p className="text-slate-500 text-[10px]">จำนวนเงิน</p><p className="font-bold text-violet-700">{Number(d.fngov_amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</p></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {parseFees(caseData.fngov_additionalFees).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">ค่าอื่นๆ</p>
+                    {parseFees(caseData.fngov_additionalFees).map((fee: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm"><span className="text-slate-600">{fee.name}</span><span className="font-medium">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</span></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* fine_btc detail */}
+          {caseData.taskType === 'fine_btc' && (
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <Hash className="w-4 h-4 text-orange-400" /> ข้อมูลคดีค่าละเมิดบิทคอยน์
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                <Field label="ชื่อนามสกุล" value={caseData.fnbtc_customerName} />
+                {Array.isArray(caseData.fnbtc_details) && caseData.fnbtc_details.length > 0 && (
+                  <div className="mt-2 space-y-3">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">รายการ CA ทั้งหมด</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {caseData.fnbtc_details.map((d: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-xl bg-orange-50/50 border border-orange-100/50">
+                          <p className="text-[10px] font-bold text-orange-600 mb-1">CA: {d.fnbtc_ReferenceNumber}</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div><p className="text-slate-500 text-[10px]">ตั้งแต่ - ถึง</p><p className="font-medium text-slate-700">{d.fnbtc_OverdueBillStart} - {d.fnbtc_overdueBillEnd}</p></div>
+                            <div className="text-right"><p className="text-slate-500 text-[10px]">จำนวนเงิน</p><p className="font-bold text-orange-700">{Number(d.fnbtc_amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</p></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {parseFees(caseData.fnbtc_additionalFees).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">ค่าอื่นๆ</p>
+                    {parseFees(caseData.fnbtc_additionalFees).map((fee: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm"><span className="text-slate-600">{fee.name}</span><span className="font-medium">{Number(fee.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บ.</span></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* fine_cable detail */}
+          {caseData.taskType === 'fine_cable' && (
+            <section className="bg-white/50 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/40 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-cyan-400" /> ข้อมูลคดีค่าละเมิดสายสื่อสาร
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="ชื่อนามสกุล" value={caseData.fncable_customerName} />
+                <Field label="จำนวนเงิน (บาท)" value={caseData.fncable_amount ? Number(caseData.fncable_amount).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : undefined} />
+                <Field label="วันที่ตรวจพบ" value={caseData.fncable_detectedDate} />
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -1883,6 +2218,9 @@ const ArchivedView = ({ onUpdate }: { onUpdate: () => void }) => {
   const getCaseDetails = (c: any) => {
     if (c.taskType === 'car_crash') return { name: c.cc_driverName || '-', ref: c.cc_ReferenceNumber || '-', type: 'รถชนเสา' };
     if (c.taskType === 'overdue_payment') return { name: c.op_customerName || '-', ref: c.op_ReferenceNumber || '-', type: 'ค่าไฟฟ้าค้างชำระ' };
+    if (c.taskType === 'gov_debt') return { name: c.fngov_customerName || '-', ref: '-', type: 'ลูกหนี้ราชการ' };
+    if (c.taskType === 'fine_btc') return { name: c.fnbtc_customerName || '-', ref: '-', type: 'ค่าละเมิดบิทคอยน์' };
+    if (c.taskType === 'fine_cable') return { name: c.fncable_customerName || '-', ref: '-', type: 'ค่าละเมิดสายสื่อสาร' };
     return { name: c.fn_customerName || '-', ref: c.fn_ReferenceNumber || '-', type: c.fn_fineTypeName || 'ค่าปรับ' };
   };
 
@@ -2098,6 +2436,18 @@ const ListView = ({ cases, dropdowns, onUpdate }: { cases: any[], dropdowns: Dro
       name = c.fn_customerName;
       referenceNumber = c.fn_ReferenceNumber;
       type = c.fn_fineTypeName || 'ค่าละเมิดการใช้ไฟฟ้า';
+    } else if (c.taskType === 'gov_debt') {
+      name = c.fngov_customerName;
+      referenceNumber = '';
+      type = 'ลูกหนี้ราชการ';
+    } else if (c.taskType === 'fine_btc') {
+      name = c.fnbtc_customerName;
+      referenceNumber = '';
+      type = 'ค่าละเมิดบิทคอยน์';
+    } else if (c.taskType === 'fine_cable') {
+      name = c.fncable_customerName;
+      referenceNumber = '';
+      type = 'ค่าละเมิดสายสื่อสาร';
     }
     return { name, referenceNumber, type };
   };
@@ -2321,6 +2671,15 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
     fn_customerName: '',
     fn_details: [],
     fn_additionalFees: [],
+    fngov_customerName: '',
+    fngov_details: [],
+    fngov_additionalFees: [],
+    fnbtc_customerName: '',
+    fnbtc_details: [],
+    fnbtc_additionalFees: [],
+    fncable_customerName: '',
+    fncable_amount: '',
+    fncable_detectedDate: '',
     notes: '',
   });
   const [files, setFiles] = useState<any[]>([]);
@@ -2368,7 +2727,7 @@ const CreateForm = ({ dropdowns, onSuccess }: { dropdowns: Dropdowns, onSuccess:
       if (response.ok) {
         setSubmitStatus('success');
         setFormData({
-          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', approvalDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], fn_details: [], notes: '',
+          taskType: 'car_crash', source: '', receiveDate: '', docNumber: '', docState: '', returnDocNumber: '', approvalDocNumber: '', taskState: '', lawyer: '', cc_licensePlate: '', cc_driverName: '', cc_ReferenceNumber: '', cc_damageAmount: '', op_ReferenceNumber: '', op_customerName: '', op_OverdueBillStart: '', op_overdueBillEnd: '', op_amount: '', fn_fineType: '', fn_fineTypeName: '', fn_ReferenceNumber: '', fn_OverdueBillStart: '', fn_OverdueBillEnd: '', fn_amount: '', fn_additionalFees: [], fn_details: [], fngov_customerName: '', fngov_details: [], fngov_additionalFees: [], fnbtc_customerName: '', fnbtc_details: [], fnbtc_additionalFees: [], fncable_customerName: '', fncable_amount: '', fncable_detectedDate: '', notes: '',
         });
         setFiles([]);
         onSuccess();

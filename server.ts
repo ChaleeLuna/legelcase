@@ -32,7 +32,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const SUPABASE_BUCKET = 'legalcase-documents';
 const WORD_TEMPLATE_DIR = path.join(process.cwd(), "templates", "word");
 const LEGACY_WORD_TEMPLATE_DIR = path.join(process.cwd(), "templates");
-const CASE_DEFAULT_HEADERS = ['id', 'taskType', 'receiveDate', 'docNumber', 'source', 'sourceName', 'docState', 'docStateName', 'taskState', 'taskStateName', 'lawyer', 'lawyerName', 'returnDocNumber', 'approvalDocNumber', 'cc_licensePlate', 'cc_driverName', 'cc_ReferenceNumber', 'cc_damageAmount', 'op_ReferenceNumber', 'op_customerName', 'op_OverdueBillStart', 'op_overdueBillEnd', 'op_amount', 'op_details', 'fn_customerName', 'fn_fineType', 'fn_fineTypeName', 'fn_ReferenceNumber', 'fn_OverdueBillStart', 'fn_OverdueBillEnd', 'fn_amount', 'fn_additionalFees', 'fn_details', 'fn_totalAmount', 'notes', 'isArchived', 'isFinish', 'courtDocument'];
+const CASE_DEFAULT_HEADERS = ['id', 'taskType', 'receiveDate', 'docNumber', 'source', 'sourceName', 'docState', 'docStateName', 'taskState', 'taskStateName', 'lawyer', 'lawyerName', 'returnDocNumber', 'approvalDocNumber', 'cc_licensePlate', 'cc_driverName', 'cc_ReferenceNumber', 'cc_damageAmount', 'op_ReferenceNumber', 'op_customerName', 'op_OverdueBillStart', 'op_overdueBillEnd', 'op_amount', 'op_details', 'fn_customerName', 'fn_fineType', 'fn_fineTypeName', 'fn_ReferenceNumber', 'fn_OverdueBillStart', 'fn_OverdueBillEnd', 'fn_amount', 'fn_additionalFees', 'fn_details', 'fn_totalAmount', 'fngov_details', 'fngov_customerName', 'fngov_additionalFees', 'fnbtc_details', 'fnbtc_customerName', 'fnbtc_additionalFees', 'fncable_details', 'fncable_customerName', 'fncable_additionalFees', 'notes', 'isArchived', 'isFinish', 'courtDocument'];
 
 const createDocxReport =
   typeof docxTemplates.createReport === "function"
@@ -593,12 +593,24 @@ async function startServer() {
         if (key.toLowerCase() === "isarchived" || key.toLowerCase() === "archived" || key.toLowerCase() === "isfinish") {
           const v = String(raw).trim().toLowerCase();
           obj[key] = v === "true" || v === "1" || v === "yes";
-        } else if (key === "fn_additionalFees" || key === "op_details" || key === "fn_details") {
+        } else if (['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees'].includes(key)) {
           // Parse JSON string back to array
           try {
             obj[key] = JSON.parse(String(raw));
           } catch {
             obj[key] = [];
+          }
+        } else if (key === 'fncable_details') {
+          // fncable_details stores {amount, detectedDate} as JSON object
+          try {
+            const parsed = JSON.parse(String(raw));
+            obj[key] = parsed;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              obj['fncable_amount'] = parsed.amount || '';
+              obj['fncable_detectedDate'] = parsed.detectedDate || '';
+            }
+          } catch {
+            obj[key] = {};
           }
         } else {
           obj[key] = raw;
@@ -755,12 +767,10 @@ async function startServer() {
         }
       }
 
-      // Parse fn_additionalFees JSON string back to array
-      if (typeof newCase.fn_additionalFees === 'string') {
-        try {
-          newCase.fn_additionalFees = JSON.parse(newCase.fn_additionalFees);
-        } catch {
-          newCase.fn_additionalFees = [];
+      // Parse JSON array fields back to arrays
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_details','fncable_additionalFees']) {
+        if (typeof newCase[field] === 'string') {
+          try { newCase[field] = JSON.parse(newCase[field]); } catch { newCase[field] = []; }
         }
       }
 
@@ -798,14 +808,15 @@ async function startServer() {
 
       // Convert fn_additionalFees array to JSON string for sheet storage
       const rowData = { ...newCase };
-      if (Array.isArray(rowData.fn_additionalFees)) {
-        rowData.fn_additionalFees = JSON.stringify(rowData.fn_additionalFees);
+      // Pack fncable scalar fields into fncable_details JSON object
+      if (rowData.taskType === 'fine_cable') {
+        rowData.fncable_details = JSON.stringify({
+          amount: rowData.fncable_amount || '',
+          detectedDate: rowData.fncable_detectedDate || ''
+        });
       }
-      if (Array.isArray(rowData.op_details)) {
-        rowData.op_details = JSON.stringify(rowData.op_details);
-      }
-      if (Array.isArray(rowData.fn_details)) {
-        rowData.fn_details = JSON.stringify(rowData.fn_details);
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
+        if (Array.isArray(rowData[field])) rowData[field] = rowData[field].length > 0 ? JSON.stringify(rowData[field]) : '';
       }
 
       const row = effectiveHeaders.map(h => rowData[h] ?? '');
@@ -914,12 +925,10 @@ async function startServer() {
         updateData.courtDocument = kept.length > 0 ? JSON.stringify(kept) : '';
       }
 
-      // Parse fn_additionalFees JSON string back to array
-      if (typeof updateData.fn_additionalFees === 'string') {
-        try {
-          updateData.fn_additionalFees = JSON.parse(updateData.fn_additionalFees);
-        } catch {
-          updateData.fn_additionalFees = [];
+      // Parse JSON array fields back to arrays
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_details','fncable_additionalFees']) {
+        if (typeof updateData[field] === 'string') {
+          try { updateData[field] = JSON.parse(updateData[field]); } catch { updateData[field] = []; }
         }
       }
 
@@ -937,21 +946,21 @@ async function startServer() {
       if (updateData.lawyer) updateData.lawyerName = (lawyerOptions.find((o: any) => o.id === updateData.lawyer) || {}).label || updateData.lawyerName || '';
       if (updateData.fn_fineType) updateData.fn_fineTypeName = (fineTypeOptions.find((o: any) => o.id === updateData.fn_fineType) || {}).label || updateData.fn_fineTypeName || '';
 
-
       const rowNum = existing.__rowNum;
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       const updated = { ...existing, ...updateData };
 
-      // Convert fn_additionalFees array to JSON string for sheet storage
-      if (Array.isArray(updated.fn_additionalFees)) {
-        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      // Serialize array fields to JSON string for sheet storage
+      // Pack fncable scalar fields into fncable_details JSON object
+      if ((updated as any).taskType === 'fine_cable') {
+        (updated as any).fncable_details = JSON.stringify({
+          amount: (updated as any).fncable_amount || '',
+          detectedDate: (updated as any).fncable_detectedDate || ''
+        });
       }
-      if (Array.isArray(updated.op_details)) {
-        updated.op_details = JSON.stringify(updated.op_details);
-      }
-      if (Array.isArray(updated.fn_details)) {
-        updated.fn_details = JSON.stringify(updated.fn_details);
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
+        if (Array.isArray(updated[field])) updated[field] = updated[field].length > 0 ? JSON.stringify(updated[field]) : '';
       }
 
       const row = effectiveHeaders.map(h => updated[h] ?? '');
@@ -994,15 +1003,15 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
-      // Convert fn_additionalFees array to JSON string if present
-      if (Array.isArray(updated.fn_additionalFees)) {
-        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      // Serialize array fields to JSON string for sheet storage
+      if ((updated as any).taskType === 'fine_cable') {
+        (updated as any).fncable_details = JSON.stringify({
+          amount: (updated as any).fncable_amount || '',
+          detectedDate: (updated as any).fncable_detectedDate || ''
+        });
       }
-      if (Array.isArray(updated.op_details)) {
-        updated.op_details = JSON.stringify(updated.op_details);
-      }
-      if (Array.isArray(updated.fn_details)) {
-        updated.fn_details = JSON.stringify(updated.fn_details);
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
+        if (Array.isArray((updated as any)[field])) (updated as any)[field] = (updated as any)[field].length > 0 ? JSON.stringify((updated as any)[field]) : '';
       }
 
       const row = effectiveHeaders.map(h => updated[h] ?? '');
@@ -1047,15 +1056,15 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
-      // Convert fn_additionalFees array to JSON string if present
-      if (Array.isArray(updated.fn_additionalFees)) {
-        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      // Serialize array fields to JSON string for sheet storage
+      if ((updated as any).taskType === 'fine_cable') {
+        (updated as any).fncable_details = JSON.stringify({
+          amount: (updated as any).fncable_amount || '',
+          detectedDate: (updated as any).fncable_detectedDate || ''
+        });
       }
-      if (Array.isArray(updated.op_details)) {
-        updated.op_details = JSON.stringify(updated.op_details);
-      }
-      if (Array.isArray(updated.fn_details)) {
-        updated.fn_details = JSON.stringify(updated.fn_details);
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
+        if (Array.isArray((updated as any)[field])) (updated as any)[field] = (updated as any)[field].length > 0 ? JSON.stringify((updated as any)[field]) : '';
       }
 
       const row = effectiveHeaders.map(h => updated[h] ?? '');
@@ -1096,14 +1105,14 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
-      if (Array.isArray(updated.fn_additionalFees)) {
-        updated.fn_additionalFees = JSON.stringify(updated.fn_additionalFees);
+      if ((updated as any).taskType === 'fine_cable') {
+        (updated as any).fncable_details = JSON.stringify({
+          amount: (updated as any).fncable_amount || '',
+          detectedDate: (updated as any).fncable_detectedDate || ''
+        });
       }
-      if (Array.isArray(updated.op_details)) {
-        updated.op_details = JSON.stringify(updated.op_details);
-      }
-      if (Array.isArray(updated.fn_details)) {
-        updated.fn_details = JSON.stringify(updated.fn_details);
+      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
+        if (Array.isArray((updated as any)[field])) (updated as any)[field] = (updated as any)[field].length > 0 ? JSON.stringify((updated as any)[field]) : '';
       }
 
       const row = effectiveHeaders.map(h => updated[h] ?? '');
