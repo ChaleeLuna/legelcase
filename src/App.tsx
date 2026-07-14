@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import ExportView from './ExportView';
 import { motion, AnimatePresence } from 'motion/react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -6,7 +7,8 @@ import {
   FileText, Car, CreditCard, Upload, CheckCircle2, AlertCircle, Search, ChevronDown,
   LayoutDashboard, PlusCircle, Menu, X, ChevronLeft, ChevronRight, Edit2,
   Archive, BarChart2, PanelLeftClose, PanelLeftOpen, GripVertical, Gavel, Trash2, Plus,
-  User, Hash, ClipboardList, FileCheck, FolderArchive, XCircle, LogOut, ShieldCheck, Clock, Download
+  User, Hash, ClipboardList, FileCheck, FolderArchive, XCircle, LogOut, ShieldCheck, Clock, Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 declare const liff: any;
@@ -2835,7 +2837,7 @@ function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authStatus, setAuthStatus] = useState<'loading' | 'pending' | 'approved' | 'error'>('loading');
   const [authError, setAuthError] = useState<string>('');
-  const [currentView, setCurrentView] = useState<'stats' | 'list' | 'kanban' | 'create' | 'archived'>('stats');
+  const [currentView, setCurrentView] = useState<'stats' | 'list' | 'kanban' | 'create' | 'archived' | 'export'>('stats');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
@@ -3031,6 +3033,7 @@ function App() {
     { id: 'stats', label: 'สถิติภาพรวม', icon: BarChart2 },
     { id: 'list', label: 'รายการคดี', icon: LayoutDashboard },
     { id: 'create', label: 'สร้างรายการใหม่', icon: PlusCircle },
+    { id: 'export', label: 'ส่งออก', icon: FileSpreadsheet },
     { id: 'archived', label: 'เอกสารคดีที่จัดเก็บแล้ว', icon: FolderArchive },
   ];
 
@@ -3192,6 +3195,7 @@ function App() {
                 {currentView === 'stats' && <StatsDashboard cases={cases} />}
                 {currentView === 'list' && <ListView cases={cases} dropdowns={dropdowns} onUpdate={fetchData} />}
                 {currentView === 'create' && <CreateForm dropdowns={dropdowns} onSuccess={fetchData} />}
+                {currentView === 'export' && <ExportView cases={cases} />}
                 {currentView === 'archived' && <ArchivedView onUpdate={fetchData} />}
               </motion.div>
             </AnimatePresence>
