@@ -620,6 +620,71 @@ async function startServer() {
     });
   }
 
+  function serializeCaseForSheet(caseData: Record<string, any>, effectiveHeaders: string[]): (string | number | boolean)[] {
+    const updated = { ...caseData };
+
+    if (updated.taskType === 'fine_cable') {
+      updated.fncable_details = JSON.stringify({
+        amount: updated.fncable_amount || '',
+        detectedDate: updated.fncable_detectedDate || ''
+      });
+    } else if (typeof updated.fncable_details === 'object' && updated.fncable_details !== null) {
+      const isObjEmpty = Object.keys(updated.fncable_details).length === 0;
+      updated.fncable_details = isObjEmpty ? '' : JSON.stringify(updated.fncable_details);
+    }
+
+    const jsonArrayFields = [
+      'fn_additionalFees', 'op_details', 'fn_details', 'fngov_details',
+      'fngov_additionalFees', 'fnbtc_details', 'fnbtc_additionalFees',
+      'fncable_additionalFees'
+    ];
+
+    for (const field of jsonArrayFields) {
+      if (Array.isArray(updated[field])) {
+        updated[field] = updated[field].length > 0 ? JSON.stringify(updated[field]) : '';
+      } else if (typeof updated[field] === 'object' && updated[field] !== null) {
+        const isObjEmpty = Object.keys(updated[field]).length === 0;
+        updated[field] = isObjEmpty ? '' : JSON.stringify(updated[field]);
+      }
+    }
+
+    return effectiveHeaders.map(h => {
+      const val = updated[h];
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'object') {
+        const isObjEmpty = Object.keys(val).length === 0;
+        return isObjEmpty ? '' : JSON.stringify(val);
+      }
+      return val;
+    });
+  }
+
+  async function updateSheetRow(sheetName: string, rowNum: number, rowValues: any[]) {
+    const sheets = await getSheetsClient();
+    if (sheets) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: GOOGLE_SHEET_ID!,
+        range: `${sheetName}!A${rowNum}:AZ${rowNum}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [rowValues] },
+      });
+    } else if (GOOGLE_API_KEY) {
+      const range = `${sheetName}!A${rowNum}:AZ${rowNum}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
+      const resp = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [rowValues] })
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Sheets update failed (${resp.status}): ${text}`);
+      }
+    } else {
+      throw new Error('No Google Sheets client or credentials configured for writing');
+    }
+  }
+
   // GET all cases (from sheet)
   app.get("/api/cases", async (req, res) => {
     try {
@@ -806,20 +871,7 @@ async function startServer() {
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       console.log('Using headers for append:', effectiveHeaders);
 
-      // Convert fn_additionalFees array to JSON string for sheet storage
-      const rowData = { ...newCase };
-      // Pack fncable scalar fields into fncable_details JSON object
-      if (rowData.taskType === 'fine_cable') {
-        rowData.fncable_details = JSON.stringify({
-          amount: rowData.fncable_amount || '',
-          detectedDate: rowData.fncable_detectedDate || ''
-        });
-      }
-      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
-        if (Array.isArray(rowData[field])) rowData[field] = rowData[field].length > 0 ? JSON.stringify(rowData[field]) : '';
-      }
-
-      const row = effectiveHeaders.map(h => rowData[h] ?? '');
+      const row = serializeCaseForSheet(newCase, effectiveHeaders);
       console.log('Row to append:', row);
 
       if (sheets) {
@@ -950,38 +1002,8 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
       const updated = { ...existing, ...updateData };
-
-      // Serialize array fields to JSON string for sheet storage
-      // Pack fncable scalar fields into fncable_details JSON object
-      if ((updated as any).taskType === 'fine_cable') {
-        (updated as any).fncable_details = JSON.stringify({
-          amount: (updated as any).fncable_amount || '',
-          detectedDate: (updated as any).fncable_detectedDate || ''
-        });
-      }
-      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
-        if (Array.isArray(updated[field])) updated[field] = updated[field].length > 0 ? JSON.stringify(updated[field]) : '';
-      }
-
-      const row = effectiveHeaders.map(h => updated[h] ?? '');
-
-      const sheets = await getSheetsClient();
-      if (sheets) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:AZ${rowNum}`,
-          valueInputOption: 'RAW',
-          requestBody: { values: [row] },
-        });
-      } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:AZ${rowNum}`;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
-        await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [row] })
-        });
-      }
+      const row = serializeCaseForSheet(updated, effectiveHeaders);
+      await updateSheetRow('case', rowNum, row);
 
       res.json({ success: true, message: "อัปเดตข้อมูลสำเร็จ" });
     } catch (err) {
@@ -1003,36 +1025,8 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
-      // Serialize array fields to JSON string for sheet storage
-      if ((updated as any).taskType === 'fine_cable') {
-        (updated as any).fncable_details = JSON.stringify({
-          amount: (updated as any).fncable_amount || '',
-          detectedDate: (updated as any).fncable_detectedDate || ''
-        });
-      }
-      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
-        if (Array.isArray((updated as any)[field])) (updated as any)[field] = (updated as any)[field].length > 0 ? JSON.stringify((updated as any)[field]) : '';
-      }
-
-      const row = effectiveHeaders.map(h => updated[h] ?? '');
-
-      const sheets = await getSheetsClient();
-      if (sheets) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:AZ${rowNum}`,
-          valueInputOption: 'RAW',
-          requestBody: { values: [row] },
-        });
-      } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:AZ${rowNum}`;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
-        await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [row] })
-        });
-      }
+      const row = serializeCaseForSheet(updated, effectiveHeaders);
+      await updateSheetRow('case', rowNum, row);
 
       res.json({ success: true, message: "อัปเดตสถานะสำเร็จ" });
     } catch (err) {
@@ -1056,36 +1050,8 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
-      // Serialize array fields to JSON string for sheet storage
-      if ((updated as any).taskType === 'fine_cable') {
-        (updated as any).fncable_details = JSON.stringify({
-          amount: (updated as any).fncable_amount || '',
-          detectedDate: (updated as any).fncable_detectedDate || ''
-        });
-      }
-      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
-        if (Array.isArray((updated as any)[field])) (updated as any)[field] = (updated as any)[field].length > 0 ? JSON.stringify((updated as any)[field]) : '';
-      }
-
-      const row = effectiveHeaders.map(h => updated[h] ?? '');
-
-      const sheets = await getSheetsClient();
-      if (sheets) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:AZ${rowNum}`,
-          valueInputOption: 'RAW',
-          requestBody: { values: [row] },
-        });
-      } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:AZ${rowNum}`;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
-        await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [row] })
-        });
-      }
+      const row = serializeCaseForSheet(updated, effectiveHeaders);
+      await updateSheetRow('case', rowNum, row);
 
       res.json({ success: true, message: "จัดเก็บข้อมูลสำเร็จ" });
     } catch (err) {
@@ -1105,35 +1071,8 @@ async function startServer() {
       const headers = await getSheetHeaders('case');
       const effectiveHeaders = headers.length > 0 ? headers : CASE_DEFAULT_HEADERS;
 
-      if ((updated as any).taskType === 'fine_cable') {
-        (updated as any).fncable_details = JSON.stringify({
-          amount: (updated as any).fncable_amount || '',
-          detectedDate: (updated as any).fncable_detectedDate || ''
-        });
-      }
-      for (const field of ['fn_additionalFees','op_details','fn_details','fngov_details','fngov_additionalFees','fnbtc_details','fnbtc_additionalFees','fncable_additionalFees']) {
-        if (Array.isArray((updated as any)[field])) (updated as any)[field] = (updated as any)[field].length > 0 ? JSON.stringify((updated as any)[field]) : '';
-      }
-
-      const row = effectiveHeaders.map(h => updated[h] ?? '');
-
-      const sheets = await getSheetsClient();
-      if (sheets) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: GOOGLE_SHEET_ID!,
-          range: `case!A${rowNum}:AZ${rowNum}`,
-          valueInputOption: 'RAW',
-          requestBody: { values: [row] },
-        });
-      } else if (GOOGLE_API_KEY) {
-        const range = `case!A${rowNum}:AZ${rowNum}`;
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW&key=${GOOGLE_API_KEY}`;
-        await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [row] })
-        });
-      }
+      const row = serializeCaseForSheet(updated, effectiveHeaders);
+      await updateSheetRow('case', rowNum, row);
 
       res.json({ success: true, message: "ยกเลิกการจัดเก็บสำเร็จ" });
     } catch (err) {
